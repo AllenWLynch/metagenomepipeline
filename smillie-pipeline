@@ -1,0 +1,95 @@
+##!usr/local/python3
+
+import subprocess
+import os
+import argparse
+
+CLUSTER_SUBMIT_STRING = 'qsub'
+
+def check_file_exists(filename):
+    if not os.path.isfile(filename):
+        raise argparse.ArgumentTypeError(f'Invalid file name: {filename}')
+
+    return filename
+
+
+def get_parser():
+    
+    parser = argparse.ArgumentParser("""
+Command to run metagenomics pipeline. This script wraps a snakemake pipeline, which handles
+jobs scheduling and submissions to the cluster. You can modify the behavior of the snakemake pipeline
+by passing snakemake arguements following the \"-s\" flag. Useful arguemnts are:
+
+--dryrun: Print out the jobs that would be run without actually running them.
+--batch [int]/[int]: Process this fraction of the total jobs.
+--resources mem_mb=80000: Set upper limit on resources
+--rerun-incomplete: Rerun jobs that failed or were interrupted.
+--keep-going: Keep going if a job fails.
+                                     
+    """)
+    parser.add_argument('--samples-config', '-samples', type = check_file_exists, required=True,
+                        help = 'Specifies the samples and groups of samples to process')
+    parser.add_argument('--resources-config','-resources', type = check_file_exists, required=True,
+                            help = 'Specifies the resources to allocate to each job on cluster submission.')
+    parser.add_argument('--reference', '-r', type = check_file_exists, required=True,
+                            help = 'Path to reference fasta file.')
+    parser.add_argument('--gtf', '-gtf', type = check_file_exists, required=True,
+                            help= 'Path to GTF file for abundance counting.')
+    parser.add_argument('--jobs','-j', type = str, default = '1', 
+                            help = 'Maximum number of concurrent jobs to run')
+    parser.add_argument('--local', action = 'store_true', default=False,
+                            help = 'Run jobs locally instead of on cluster.')
+    parser.add_argument('--unlock', action='store_true', default=False,
+                            help = 'Unlock working directory')
+    parser.add_argument('--snake-args', '-s', nargs = argparse.REMAINDER, 
+                            help = 'Arguments to pass to snakemake')
+    
+    return parser
+
+if __name__ == "__main__":
+    
+    args = get_parser().parse_args()
+
+    snakefile = os.path.join(__file__, 'controller.smk')
+
+    command = [
+        'snakemake',
+        '-s', 'controller.smk',
+        '--use-conda',
+    ]
+
+    if args.local:
+        command.extend(
+            ['--cores', args.jobs]
+        )
+    else:
+        command.extend(
+            ['--cluster', CLUSTER_SUBMIT_STRING, '-j', args.jobs]
+        )
+
+    if args.unlock:
+        command.append('--unlock')
+
+    if not args.snake_args is None:
+        command.extend( args.snake_args )
+
+    command.extend([
+        '--configfiles', args.samples_config, args.resources_config,
+        '--config',f'reference={args.reference}',f'gtf={args.gtf}'
+    ])
+
+    print("""
+      _________       .__.__  .__  .__      __________.__              .__  .__               
+ /   _____/ _____ |__|  | |  | |__| ____\______   \__|_____   ____ |  | |__| ____   ____  
+ \_____  \ /     \|  |  | |  | |  |/ __ \|     ___/  \____ \_/ __ \|  | |  |/    \_/ __ \ 
+ /        \  Y Y  \  |  |_|  |_|  \  ___/|    |   |  |  |_> >  ___/|  |_|  |   |  \  ___/ 
+/_______  /__|_|  /__|____/____/__|\___  >____|   |__|   __/ \___  >____/__|___|  /\___  >
+        \/      \/                     \/            |__|        \/             \/     \/ 
+    """)
+    
+    print('\nRunning the following snakemake command:\n' + ' '.join(map(str, command)))
+    print('\n*********************')
+
+    subprocess.run(
+        command
+    )

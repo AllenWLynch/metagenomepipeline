@@ -1,0 +1,52 @@
+
+resources:
+
+  index:
+    mem_mb: 8000
+    runtime: 30m
+    threads: 1
+
+  trimmomatic:
+    mem_mb: 8000
+    runtime : 1h
+    threads: 1
+
+  bowtie:
+    mem_mb: 16000
+    runtime: 12h
+    threads: 8
+
+  sort:
+    mem_mb: 16000
+    runtime: 12h
+    threads: 8
+
+  filter:
+    mem_mb: 2000
+    runtime: 1h
+    threads: 1
+
+  markduplicates:
+    mem_mb: 16000
+    runtime: 24h
+    threads: 1
+
+  indexbam:
+    mem_mb: 2000
+    runtime: 4h
+    threads: 1
+    
+  htseq_count:
+    mem_mb: 2000
+    runtime: 4h
+    threads: 1
+
+  callvariants:
+    mem_mb: 8000
+    runtime: 4h
+    threads: 1
+    
+  bamcoverage:
+    mem_mb: 8000
+    runtime: 4h
+    threads: 1

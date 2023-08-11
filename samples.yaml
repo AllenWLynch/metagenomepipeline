@@ -1,0 +1,13 @@
+samples:
+  '1':
+    is_paired: TRUE
+    read1 : data/1_R1.fastq.gz
+    read2: data/1_R2.fastq.gz
+  '2':
+    is_paired: FALSE
+    read1 : data/2.fastq.gz
+
+groups:
+  'A':
+    - '1'
+    - '2'
