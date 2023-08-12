@@ -2,13 +2,6 @@
 
 # java -jar /broad/smillie-data/home/akumbhar/bin/Trimmomatic-0.39/trimmomatic-0.39.jar
 
-def double_on_failure(base_resources):
-    def _double_on_failure(wildcards, attempt):
-        return base_resources * attempt
-
-    return _double_on_failure
-
-
 rule make_index:
     input:
         config['reference']

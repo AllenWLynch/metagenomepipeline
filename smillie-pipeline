@@ -4,7 +4,7 @@ import subprocess
 import os
 import argparse
 
-CLUSTER_SUBMIT_STRING = 'qsub'
+#CLUSTER_SUBMIT_STRING = 'qsub -j y -l h_vmem={mem_mb} -l h_rt={runtime} -pe smp {threads} -P broad'
 
 def check_file_exists(filename):
     if not os.path.isfile(filename):
@@ -63,9 +63,17 @@ if __name__ == "__main__":
             ['--cores', args.jobs]
         )
     else:
-        command.extend(
-            ['--cluster', CLUSTER_SUBMIT_STRING, '-j', args.jobs]
-        )
+        cluster_options = {
+            'latency-wait': 60,
+            'restart-times': 3,
+            'cluster': "cluster/qsub-submit.py",
+            'cluster-status': "cluster/qsub-status.py",
+            'jobscript': "qsub-jobscript.sh",
+        }
+
+        for k, v in cluster_options.items():
+            command.extend([f'--{k}', v])
+
 
     if args.unlock:
         command.append('--unlock')
