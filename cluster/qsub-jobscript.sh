@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # properties = {properties}
 
+source /broad/software/scripts/useuse
+use UGER
+use Anaconda3
+source activate snakemake
+
 # print cluster job id
 echo "Running cluster job $JOB_ID"
 echo "-----------------------------"

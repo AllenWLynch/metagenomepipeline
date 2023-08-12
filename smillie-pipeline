@@ -65,14 +65,15 @@ if __name__ == "__main__":
     else:
         cluster_options = {
             'latency-wait': 60,
-            'restart-times': 3,
+            'restart-times': 1,
             'cluster': "cluster/qsub-submit.py",
             'cluster-status': "cluster/qsub-status.py",
-            'jobscript': "qsub-jobscript.sh",
+            'jobscript': "cluster/qsub-jobscript.sh",
+            'jobs' : args.jobs,
         }
 
         for k, v in cluster_options.items():
-            command.extend([f'--{k}', v])
+            command.extend([f'--{k}', str(v)])
 
 
     if args.unlock:

@@ -30,7 +30,7 @@ from snakemake.utils import read_job_properties  # get info from jobscript
 from snakemake.shell import shell  # to run shell command nicely
 import yaml
 
-cluster_config = yaml.safe_load(Path("cluster.yaml").read_text())
+cluster_config = yaml.safe_load(Path("cluster/cluster.yaml").read_text())
 
 # get the jobscript (last argument)
 jobscript = sys.argv[-1]
@@ -148,4 +148,4 @@ shell_stdout = shell(
 )
 
 # obtain job id from this, and print
-print(shell_stdout.decode().strip())
+print(shell_stdout.strip())
