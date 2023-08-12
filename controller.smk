@@ -24,9 +24,15 @@ Config schema:
     "index" : "path/to/bt2_index",
 }
 """
+def double_on_failure(base_resources):
+    def _double_on_failure(wildcards, attempt):
+        return base_resources * attempt
 
+    return _double_on_failure
+    
 include: "alignment.smk"
 include: "postprocessing.smk"
+include: "analysis.smk"
 
 # for each sample, collect these results
 sample_level_files = [
