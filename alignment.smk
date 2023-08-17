@@ -61,11 +61,18 @@ def get_gff(wildcards):
         return rules.merge_annotations.output.gff
 
 
+rule testrule:
+    output: "test.txt"
+    conda : "envs/bowtie2.yaml"
+    shell : "echo 'this' > {output}"
+
+index_prefix = 'index/bowtie2_index.bt2'
+
 rule make_index:
     input:
         get_reference
     output:
-        'index/bowtie2_index.bt2'
+        index_prefix + '.1.bt2'
     log:
         'logs/index/index.log'
     resources:
@@ -78,7 +85,7 @@ rule make_index:
     conda:
         'envs/bowtie2.yaml'
     shell:
-        'bowtie2-build {input} {output}'
+        'bowtie2-build {input} ' + index_prefix
 
 
 rule trim_reads_paired:
@@ -154,9 +161,11 @@ rule align_pe:
     threads: config['resources']['bowtie']['threads']
     message:
         'Aligning reads for {wildcards.sample}'
+    params:
+        index = index_prefix
     shell:
         """
-        bowtie2 -x {input.index} \
+        bowtie2 -x {params.index} \
             -1 {input.reads[0]} -2 {input.reads[1]} \
             --threads {threads} \
             --very-sensitive -a --no-unal -S {output} \
@@ -167,7 +176,7 @@ rule align_pe:
 rule align_se:
     input:
         reads = rules.trim_reads_unpaired.output,
-        index = rules.make_index.output
+        index = rules.make_index.output,
     output:
         temp('temp/align/{sample}-se.sam')
     log:
@@ -180,9 +189,11 @@ rule align_se:
     threads: config['resources']['bowtie']['threads']
     message:
         'Aligning reads for {wildcards.sample}'
+    params:
+        index = index_prefix
     shell:
         """
-        bowtie2 -x {input.index} \
+        bowtie2 -x {params.index} \
             -U {input.reads} \
             --threads {threads} \
             --very-sensitive -a --no-unal -S {output} \

@@ -1,15 +1,10 @@
 samples:
   '1':
     is_paired: TRUE
-    disease : IBD
-    read1 : data/1_R1.fastq.gz
-    read2: data/1_R2.fastq.gz
-  '2':
-    is_paired: FALSE
-    disease : HC
-    read1 : data/2.fastq.gz
+    read1 : /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R1.fastq.gz
+    read2: /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R2.fastq.gz
 
 groups:
   'A':
     - '1'
-    - '2'
+
