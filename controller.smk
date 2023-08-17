@@ -1,5 +1,3 @@
-
-#configfile: "config.yaml"
 """
 Config schema:
 
@@ -24,6 +22,7 @@ Config schema:
     "index" : "path/to/bt2_index",
 }
 """
+
 def double_on_failure(base_resources):
     def _double_on_failure(wildcards, attempt):
         return base_resources * attempt
@@ -36,9 +35,9 @@ include: "analysis.smk"
 
 # for each sample, collect these results
 sample_level_files = [
-    'htseq_counts/{sample}.htseq.counts',
-    'coverage/{sample}.bamcoverage',
-    'bams/{sample}.bam.bai',
+    rules.htseq_count.output,
+    rules.get_allele_counts.output,
+    rules.annotate_vcf.output,
 ]
 
 sample_targets = [
@@ -47,13 +46,7 @@ sample_targets = [
         for result in expand(sample_result, sample = config['samples'].keys())
     ]
 
-# for each group collect these results
-group_targets = expand(
-    'vcfs/{group}.vcf.gz',
-    group = config['groups'].keys()
-)
-
 # set the union of sample and group-level files as the target for the pipeline.
 rule all:
-    input: sample_targets + group_targets
+    input: sample_targets
         

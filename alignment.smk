@@ -1,12 +1,71 @@
+import os
+import glob
+
+download_url = '"https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{genome}/download?include_annotation_type=GENOME_FASTA,GENOME_GFF,RNA_FASTA,CDS_FASTA,PROT_FASTA,SEQUENCE_REPORT&filename={genome}.zip"'
+
+rule download_genome:
+    output:
+        temp('{genome}.zip')
+    params:
+        url = lambda wildcards : download_url.format(genome = wildcards.genome)
+    group: 'download'
+    shell:
+        'curl -OJX GET {params.url} -H "Accept: application/zip"'
+
+ncbi_fasta_name = 'genomes/{genome}/{genome}_{name}_genomic.fna'
 
 
-# java -jar /broad/smillie-data/home/akumbhar/bin/Trimmomatic-0.39/trimmomatic-0.39.jar
+rule move_genome:
+    input:
+        rules.download_genome.output
+    output:
+        _dir = directory('genomes/{genome}'),
+        gff = 'genomes/{genome}/genomic.gff',
+        fasta = 'genomes/{genome}/genomic.fna'
+    group: 'download'
+    params:
+        fasta_download = lambda wildcards : ncbi_fasta_name.format(genome = wildcards.genome, name = "*"),
+    shell:
+        'mkdir -p genomes/tmp/{wildcards.genome} && mkdir -p genomes/{wildcards.genome} && '
+        'unzip {wildcards.genome}.zip -d genomes/tmp/{wildcards.genome} && '\
+        'mv genomes/tmp/{wildcards.genome}/ncbi_dataset/data/{wildcards.genome}/* genomes/{wildcards.genome}/ && '
+        'mv {params.fasta_download} {output.fasta}'
+
+
+rule merge_annotations:
+    input:
+        fastas = expand(rules.move_genome.output.fasta, 
+            genome = [metadata['reference'] for species, metadata in config['genomes'].items()]
+        ),
+        gff = expand(rules.move_genome.output.gff, 
+            genome = [metadata['reference'] for species, metadata in config['genomes'].items()]
+        )
+    output:
+        fasta = 'genomes/fasta.fna',
+        gff = 'genomes/gff.gff'
+    shell:
+        "cat {input.fastas} > {output.fasta} && cat {input.gff} | grep -v '#' > {output.gff}"
+
+
+def get_reference(wildcards):
+    if 'reference' in config:
+        return config['reference']
+    else:
+        return rules.merge_annotations.output.fasta
+
+
+def get_gff(wildcards):
+    if 'gff' in config:
+        return config['gff']
+    else:
+        return rules.merge_annotations.output.gff
+
 
 rule make_index:
     input:
-        config['reference']
+        get_reference
     output:
-        'bowtie2_index.bt2'
+        'index/bowtie2_index.bt2'
     log:
         'logs/index/index.log'
     resources:
@@ -41,13 +100,14 @@ rule trim_reads_paired:
     threads: config['resources']['trimmomatic']['threads']
     message:
         'Trimming reads for PE sample {wildcards.sample}'
+    params:
+        adapters = config['adapter_fa']
     shell:
         """
         trimmomatic \
             PE {input.r1} {input.r2} {output.r1} {output.unmatched1} {output.r2} {output.unmatched2} \
-            ILLUMINACLIP:/broad/smillie-data/db/adapters.mgx.fa:2:30:10:8:TRUE \
-            MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 \
-            && sleep 10 && du -sh {output.r1} > {log}
+            ILLUMINACLIP:{params.adapters}:2:30:10:8:TRUE \
+            MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20
         """
 
 
@@ -66,11 +126,13 @@ rule trim_reads_unpaired:
     threads: config['resources']['trimmomatic']['threads']
     message:
         'Trimming reads for SE sample {wildcards.sample}'
+    params:
+        adapters = config['adapter_fa']
     shell:
         """
         trimmomatic \
             SE {input} {output} \
-            ILLUMINACLIP:/broad/smillie-data/db/adapters.mgx.fa:2:30:10 \
+            ILLUMINACLIP:{params.adapters}:2:30:10 \
             MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 \
             && sleep 10 && du -sh {output} > {log}
         """

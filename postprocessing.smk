@@ -41,7 +41,7 @@ rule markduplicates:
     input:
         rules.sort.output,
     output:
-        protected('bams/{sample}.bam'),
+        protected('analysis/samples/{sample}/bam.sorted.bam'),
     log:
         'logs/markdups/{sample}.bam.log'
     conda:
@@ -63,7 +63,7 @@ rule indexbam:
     input:
         rules.markduplicates.output,
     output:
-        protected('bams/{sample}.bam.bai')
+        protected(rules.markduplicates.output[0] + '.bai')
     conda:
         'envs/samtools.yaml'
     resources:
