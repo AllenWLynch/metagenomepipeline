@@ -40,6 +40,8 @@ by passing snakemake arguements following the \"-s\" flag. Useful arguemnts are:
                             help = 'Unlock working directory')
     parser.add_argument('--snake-args', '-s', nargs = argparse.REMAINDER, 
                             help = 'Arguments to pass to snakemake')
+    parser.add_argument('--gatk-path', '-gatk', type = str, default = '/broad/smillie-data/home/lynchall/gatk/gatk-4.4.0.0/gatk',
+                            help = 'Path to GATK installation')
     
     return parser
 
@@ -79,6 +81,7 @@ if __name__ == "__main__":
 
     command.extend([
         '--configfiles', args.samples_config, args.resources_config, args.sequences_config,
+        '--config', 'gatk_path=' + args.gatk_path
     ])
 
     print("""

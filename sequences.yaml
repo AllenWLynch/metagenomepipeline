@@ -1,7 +1,7 @@
 
 
 
-adapter_fa : data/adapters.fa
+adapter_fa : /broad/smillie-data/db/adapters/adapters.mgx.fa
 phylogeny_genes : 
   - dnaG
   - dnaN
@@ -15,7 +15,5 @@ phylogeny_genes :
 
 genomes:
   Dorie:
-    reference : GCA_016889925.1
-  Bacilis:
     reference : GCF_902387545.1
   

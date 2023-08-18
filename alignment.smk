@@ -43,8 +43,25 @@ rule merge_annotations:
     output:
         fasta = 'genomes/fasta.fna',
         gff = 'genomes/gff.gff'
+    group : "merge-genomes"
     shell:
         "cat {input.fastas} > {output.fasta} && cat {input.gff} | grep -v '#' > {output.gff}"
+
+
+rule summarize_genomes:
+    input:
+        rules.merge_annotations.output.fasta,
+    output:
+        index = protected('genomes/fasta.fna.fai'),
+        chromsizes = protected('genomes/fasta.chromsizes'),
+        dict = protected('genomes/fasta.dict'),
+    conda:
+        "envs/samtools.yaml"
+    group: "merge-genomes"
+    shell:
+        "samtools faidx {input} && "
+        "cut -f1,2 {output.index} > {output.chromsizes} && "
+        "samtools dict {input} -o {output.dict}"
 
 
 def get_reference(wildcards):
@@ -95,8 +112,8 @@ rule trim_reads_paired:
     output:
         r1 = temp('temp/fastq/{sample}_R1.trim.fastq.gz'),
         r2 = temp('temp/fastq/{sample}_R2.trim.fastq.gz'),
-        unmatched1 = temp('temp/{sample}_R1.trim.unpaired.fastq.gz'),
-        unmatched2 = temp('temp/{sample}_R2.trim.unpaired.fastq.gz'),
+        unmatched1 = temp('temp/fastq/{sample}_R1.trim.unpaired.fastq.gz'),
+        unmatched2 = temp('temp/fastq/{sample}_R2.trim.unpaired.fastq.gz'),
     log:
         'logs/trim/{sample}.trim.log'
     conda:
@@ -150,7 +167,7 @@ rule align_pe:
         reads = rules.trim_reads_paired.output,
         index = rules.make_index.output
     output:
-        temp('temp/align/{sample}-pe.sam')
+        'temp/align/{sample}-pe.sam'
     log:
         'logs/align/{sample}.sam.log'
     conda:
@@ -165,7 +182,8 @@ rule align_pe:
         index = index_prefix
     shell:
         """
-        bowtie2 -x {params.index} \
+        bowtie2 --rg-id {wildcards.sample} --rg SM:{wildcards.sample} \
+            -x {params.index} \
             -1 {input.reads[0]} -2 {input.reads[1]} \
             --threads {threads} \
             --very-sensitive -a --no-unal -S {output} \

@@ -36,8 +36,8 @@ include: "analysis.smk"
 # for each sample, collect these results
 sample_level_files = [
     rules.htseq_count.output,
-    rules.get_allele_counts.output,
-    rules.annotate_vcf.output,
+    rules.get_sample_vcf.output,
+    rules.bamcoverage.output,
 ]
 
 sample_targets = [

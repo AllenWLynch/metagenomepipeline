@@ -1,5 +1,5 @@
 
-
+'''
 rule filter_sam:
     input:
         lambda w : 'temp/align/{sample}-{endedness}.sam'.format(
@@ -18,15 +18,18 @@ rule filter_sam:
         python code/filter_sam.py {input} 90 25 > {output} \
             && sleep 10 && du -sh {output} > {log}
         """
+'''
 
 
 rule sort:
     input:
-        rules.filter_sam.output,
+        lambda w : 'temp/align/{sample}-{endedness}.sam'.format(
+                        sample = w.sample, endedness = 'pe' if config['samples'][w.sample]['is_paired'] else 'se'
+                    )    
     output:
-        temp('temp/align/{sample}.bam')
+        temp('temp/align/{sample}.sorted.bam')
     log:
-        'logs/sort/{sample}.bam.log'
+        'logs/sort/{sample}.sorted.bam.log'
     conda:
         'envs/samtools.yaml'
     resources:
@@ -34,16 +37,15 @@ rule sort:
         runtime = double_on_failure(config['resources']['sort']['runtime']),
     threads: config['resources']['sort']['threads']
     shell:
-        'samtools sort {input} -O bam -@ {threads} > {output}'
-
+        "samtools view -h {input} | samtools sort -O bam -@ 8 > {output}"
 
 rule markduplicates:
     input:
         rules.sort.output,
     output:
-        protected('analysis/samples/{sample}/bam.sorted.bam'),
+        protected('analysis/samples/{sample}/bam.sorted.mkdup.bam'),
     log:
-        'logs/markdups/{sample}.bam.log'
+        'logs/markdups/{sample}.sorted.mkdup.bam.log'
     conda:
         'envs/picard.yaml'
     resources:
@@ -52,10 +54,11 @@ rule markduplicates:
     threads: config['resources']['markduplicates']['threads']
     shell:
         """
-        java -jar picard.jar MarkDuplicates \
+        picard MarkDuplicates \
             I={input} \
             O={output} \
-            M={log} \
+            M={log} && \
+        samtools index {output}
         """
 
 

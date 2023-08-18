@@ -28,7 +28,7 @@ resources:
 
   markduplicates:
     mem_mb: 16000
-    runtime: 24h
+    runtime: 12h
     threads: 1
 
   indexbam:

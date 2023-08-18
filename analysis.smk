@@ -12,15 +12,16 @@ rule htseq_count:
     conda:
         'envs/htseq.yaml'
     shell:
-        'htseq-count -r pos -s no -a 0 -t gene {input.bam} {input.gff} > {output}'
+        'htseq-count -i Name -r pos -s no -a 0 --secondary-alignments ignore -t gene {input.bam} {input.gff} > {output}'
 
 
 rule bamcoverage:
     input:
-        bam=rules.markduplicates.output,
-        bai=rules.indexbam.output,
+        bam = rules.markduplicates.output,
+        chromsizes = rules.summarize_genomes.output.chromsizes
     output:
-        protected('analysis/samples/{sample}/coverage.bamcoverage')
+        bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
+        bigwig = protected('analysis/samples/{sample}/coverage.bigwig')
     log:
         'logs/coverage/{sample}.coverage.log',
     resources:
@@ -28,9 +29,13 @@ rule bamcoverage:
         runtime = double_on_failure(config['resources']['bamcoverage']['runtime'])
     threads: config['resources']['bamcoverage']['threads']
     conda:
-        'envs/samtools.yaml'
+        'envs/bedtools.yaml'
     shell:
-        'samtools view -s {input} -F4 | bedtools coverage > {output}'
+        """
+        samtools view -q 0 -b -F 0x400 -F 0x100 -F 0x800 {input.bam} | \
+        bedtools genomecov -ibam - -bga > {output.bedgraph} && \
+        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
+        """
 
 
 def list_input_samples(w):
@@ -43,8 +48,8 @@ rule callvariants:
         samples = list_input_samples,
         reference = get_reference,
     output:
-        vcf = temp('analysis/groups/{group}/vcf.gz'),
-        stats = protected('analysis/groups/{group}/vcf.stats')
+        vcf = 'analysis/groups/{group}/vcf.gz',
+        #stats = protected('analysis/groups/{group}/vcf.stats')
     log:
         'logs/mutect/{group}.mutect.log'
     resources:
@@ -53,14 +58,17 @@ rule callvariants:
     threads: config['resources']['callvariants']['threads']
     params:
         input_list = lambda w : '-I ' + ' -I '.join(list_input_samples(w)),
-        imputed_af = 1/len(config['groups']),
+        imputed_af = 1/3, #len(config['groups']),
+        gatk_path = config['gatk_path']
     #conda:
     #    'envs/gatk.yaml'
     shell:
         """
-        gatk mutect2 -O {output.vcf} \
+        {params.gatk_path} \
+        Mutect2 -O {output.vcf} \
             {params.input_list} \
-            --reference {input.reference}
+            --reference {input.reference} \
+            --af-of-alleles-not-in-resource {params.imputed_af}
         """
 
 sample_group_dict = {sample : group for group, samples in config['groups'].items()
@@ -71,13 +79,14 @@ rule get_sample_vcf:
     input:
         vcf = lambda w : rules.callvariants.output.vcf.\
             format(group = sample_group_dict[w.sample]),
+        reference = get_reference
     output:
         protected('analysis/samples/{sample}/vcf.bcf')
     conda:
         "envs/bcftools.yaml"
     shell:
-        "gzip -d {input} | bcftools view -c1 -Oz -s {wildcards.sample} | "
-        "bcftools norm -m+any > {output}"
+        "gunzip -c {input.vcf} | bcftools view -c1 -Ov -s {wildcards.sample} | "
+        "bcftools norm -f {input.reference} -Oz > {output}"
 
 
 rule get_allele_counts:
