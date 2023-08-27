@@ -1,10 +1,16 @@
+from math import sqrt, log10
 
+
+## Section 1 - species abundances
+#  Count the number of mapped reads falling on each "gene" feature in the gff
+#  Save genes x counts for each genome in a separate file
+##
 rule htseq_count:
     input:
        bam = rules.markduplicates.output,
-       gff = get_gff
+       gff = rules.move_genome.output.gff,
     output:
-        protected('analysis/samples/{sample}/htseq.counts')
+        temp('analysis/samples/{sample}/feature_counts/{genome}_htseq.counts')
     resources:
         mem_mb = double_on_failure(config['resources']['htseq_count']['mem_mb']),
         runtime = double_on_failure(config['resources']['htseq_count']['runtime'])
@@ -12,16 +18,43 @@ rule htseq_count:
     conda:
         'envs/htseq.yaml'
     shell:
-        'htseq-count -i Name -r pos -s no -a 0 --secondary-alignments ignore -t gene {input.bam} {input.gff} > {output}'
+        """
+        cat {input.gff} | grep ";gene=" > {input.gff}.tmp && \
+        htseq-count -i gene -r pos -s no -a 0 --secondary-alignments ignore -t gene \
+            {input.bam} {input.gff}.tmp > {output} &&
+        rm {input.gff}.tmp
+        """
 
+# Aggregate the counts for each genome into a single file 
+# which describes relative abundances for each species in the sample
+#
+rule summarize_abundances:
+    input:
+        gene_counts = lambda w :expand(rules.htseq_count.output, genome = genomes_list, sample = w.sample)
+    output:
+        'analysis/samples/{sample}/gene_counts.tsv'
+    params:
+        genomes = genomes_list
+    run:
+        import pandas as pd
+        pd.concat([
+                pd.read_csv(filename, sep = '\t', header = None, names = ['gene', genome]).set_index('gene')
+                for genome, filename in zip(params.genomes, input.gene_counts)
+            ], axis = 1,
+        ).fillna(0.).to_csv(output[0], sep = '\t')
+    
 
+## Section 2
+#
+#
+##
 rule bamcoverage:
     input:
         bam = rules.markduplicates.output,
         chromsizes = rules.summarize_genomes.output.chromsizes
     output:
         bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
-        bigwig = protected('analysis/samples/{sample}/coverage.bigwig')
+        bigwig = 'analysis/samples/{sample}/coverage.bigwig'
     log:
         'logs/coverage/{sample}.coverage.log',
     resources:
@@ -38,58 +71,171 @@ rule bamcoverage:
         """
 
 
-def list_input_samples(w):
-    return [rules.markduplicates.output[0].format(sample = sample)
+cnv_outprefix = 'analysis/samples/{sample}/MetaCNV'
+rule call_cnvs_and_ptrs:
+    input:
+        fasta = get_reference,
+        bigwig = rules.bamcoverage.output.bigwig,
+        ori = rules.summarize_genomes.output.oris,
+    output:
+        cnv_info = cnv_outprefix + '.ploidy.bgmtx.gz',
+        cnv_calls = cnv_outprefix + '.ploidy.bedgraph.gz',
+        ptr = cnv_outprefix + '.PTR.tsv',
+        cnv_deviations = cnv_outprefix + '.deviations.bed',
+    params:
+        outprefix = cnv_outprefix,
+    resources:
+        mem_mb = double_on_failure(config['resources']['call_cnvs_and_ptrs']['mem_mb']),
+        runtime = double_on_failure(config['resources']['call_cnvs_and_ptrs']['runtime'])
+    threads: 1
+    conda:
+        "envs/metaCNV.yaml"
+    shell:
+        """
+        python programs/metaCNV/RunMetaCNV \
+            --fasta {input.fasta} \
+            --bigwig {input.bigwig} \
+            --ori {input.ori} \
+            --outprefix {params.outprefix} && \
+        \
+        gunzip -c {output.cnv_calls} | \
+            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,{wildcards.sample},$4}}' > {output.cnv_deviations}
+        """
+
+
+def list_input_samples(w, rule):
+    return [rule.format(sample = sample)
             for sample in config['groups'][w.group]
-        ]
+           ]
 
 rule callvariants:
     input:
-        samples = list_input_samples,
+        samples = lambda w : list_input_samples(w, rules.markduplicates.output[0]),
         reference = get_reference,
+        cnv_calls = lambda w : list_input_samples(w, rules.call_cnvs_and_ptrs\
+                                    .output.cnv_deviations),
     output:
-        vcf = 'analysis/groups/{group}/vcf.gz',
-        #stats = protected('analysis/groups/{group}/vcf.stats')
+        vcf = 'analysis/groups/{group}/vcf.vcf',
+        cnv_profile = 'analysis/groups/{group}/cnv_profile.bed',
     log:
-        'logs/mutect/{group}.mutect.log'
+        'logs/freebayes/{group}.callvariants.log'
     resources:
         mem_mb = double_on_failure(config['resources']['callvariants']['mem_mb']),
         runtime = double_on_failure(config['resources']['callvariants']['runtime'])
     threads: config['resources']['callvariants']['threads']
     params:
-        input_list = lambda w : '-I ' + ' -I '.join(list_input_samples(w)),
-        imputed_af = 1/3, #len(config['groups']),
-        gatk_path = config['gatk_path']
-    #conda:
-    #    'envs/gatk.yaml'
+        samples = lambda w : '-b ' + ' -b '.join(list_input_samples(w, rules.markduplicates.output[0])),
+        ploidy = 6, # We can assume that each *sample* is haploid at non-CNV loci, since there will probably be a genotypically dominant strain
+                    # and most alleles will have AF=1. A pooled sample, however, will have potentially `n_samples`*1 haplotypes.
+                    # Since CNV loci will appear to have greater allelic diversity due to duplicated/paralogous sequence mapping, 
+                    # the CNV map will help determine the ploidy to model at those loci.
+                    #lambda w : max( int(sqrt( len(list_input_samples(w, rules.markduplicates.output[0])) )), 1 ),
+    conda:
+        'envs/freebayes.yaml'
     shell:
         """
-        {params.gatk_path} \
-        Mutect2 -O {output.vcf} \
-            {params.input_list} \
-            --reference {input.reference} \
-            --af-of-alleles-not-in-resource {params.imputed_af}
+        cat {input.cnv_calls} | awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' > {output.cnv_profile} && \
+        \
+        freebayes -f {input.reference} {params.samples} \
+            --ploidy {params.ploidy} \
+            --cnv-map {output.cnv_profile} \
+            --pooled-discrete \
+            --pooled-continuous \
+            --use-best-n-alleles 6 \
+            --min-alternate-count 2 \
+            --min-alternate-fraction 0.01 \
+            --haplotype-length 3 \
+            --allele-balance-priors-off \
+            --report-genotype-likelihood-max > {output.vcf} 2> {log}
         """
 
-sample_group_dict = {sample : group for group, samples in config['groups'].items()
-                     for sample in samples}
+def fdr_to_qual(fdr):
+    return int(-10 * log10(fdr))
 
-# splits samples and normalizes VCF to remove multiallelic sites
+rule filter_variants:
+    input:
+        vcf = rules.callvariants.output.vcf,
+        reference = get_reference
+    output:
+        vcf = 'analysis/groups/{group}/vcf.filtered.bcf'
+    log:
+        'logs/mutect/{group}.filter_variants.log'
+    conda:
+        'envs/bcftools.yaml'
+    params:
+        samples = lambda w : config['groups'][w.group],
+        min_reads = 3,
+        qual = fdr_to_qual(0.01),
+    shell:
+        """
+        bcftools norm -f {input.reference} {input.vcf} | \
+        bcftools filter -i 'FMT/DP>={params.min_reads} && QUAL>={params.qual}' -Oz > {output.vcf} && \
+        bcftools index {output.vcf}
+        """
+
+
+rule merge_vcfs:
+    input:
+        expand(rules.filter_variants.output.vcf, group = config['groups'].keys()),
+    output:
+        temp('analysis/all/variants.vcf')
+    conda:
+        "envs/bcftools.yaml"
+    shell:
+        "bcftools merge {input} -Ov > {output}"
+
+
+rule make_snpEff_db:
+    input:
+        fasta = get_reference,
+        gff = get_gff,
+    output:
+        config = 'analysis/snpEff/snpEff.config',
+        done = touch('analysis/snpEff/done.txt')
+    conda:
+        "envs/snpEff.yaml"
+    params:
+        db = 'IBD',
+        genome_dir = 'analysis/snpEff/data/'
+    shell:
+        """
+        mkdir -p {params.genome_dir}/{params.db} && \
+        echo -e "{params.db}.genome : {params.db}" > {output.config} && \
+        cp {input.gff} {params.genome_dir}/{params.db}/genes.gff && \
+        cp {input.fasta} {params.genome_dir}/{params.db}/sequences.fa && \
+        snpEff build -gff3 -v -c {output.config} -noCheckCDS -noCheckProtein {params.db}
+        """
+
+
+rule annotate_vcf:
+    input:
+        vcf = rules.merge_vcfs.output,
+        snpEff_database = rules.make_snpEff_db.output,
+        snpEff_config = rules.make_snpEff_db.output.config,
+    output:
+        protected('analysis/all/variants.annotated.bcf')
+    conda:
+        "envs/snpEff.yaml"
+    params:
+        config = 'analysis/snpEff/snpEff.config',
+    shell:
+        "snpEff -c {input.snpEff_config} IBD {input.vcf} | " \
+        "bcftools view -Oz > {output} && bcftools index {output}"
+
+
 rule get_sample_vcf:
     input:
-        vcf = lambda w : rules.callvariants.output.vcf.\
-            format(group = sample_group_dict[w.sample]),
-        reference = get_reference
+        rules.annotate_vcf.output
     output:
         protected('analysis/samples/{sample}/vcf.bcf')
     conda:
         "envs/bcftools.yaml"
     shell:
-        "gunzip -c {input.vcf} | bcftools view -c1 -Ov -s {wildcards.sample} | "
-        "bcftools norm -f {input.reference} -Oz > {output}"
+        "bcftools view {input} -c1 -Oz -s {wildcards.sample} > {output} && bcftools index {output}"
 
 
-rule get_allele_counts:
+'''
+rule get_snp_counts:
     input:
         rules.get_sample_vcf.output
     output:
@@ -98,43 +244,9 @@ rule get_allele_counts:
         "envs/bcftools.yaml"
     shell:
         """
-        bcftools norm -m+any -a --exclude 'TYPE=\"indel\"' {input} | \
-        bcftools query -f '%CHROM %POS %REF %ALT %INFO/AC %INFO/DP' | \
+        bcftools view calls.norm.vcf --exclude 'TYPE!="snp"' | \
+        bcftools norm -m+any -a | bcftools query -f '%CHROM\t %POS\t %REF\t %ALT\t%INFO/AF\t %INFO/DP\n' | \
         python scripts/get_readsupport.py | bgzip -c > {output} && \
         tabix -s1 -b2 -e2 {output}
         """
-
-
-rule make_snpEff_db:
-    input:
-        reference = get_reference,
-        gff = get_gff,
-    output:
-        'analysis/snpEff/snpEff.config'
-    #conda:
-    #    "envs/snpEff.yaml"
-    shell:
-        "snpEff build -gff3 -v {input.reference} > {output}"
-
-
-rule annotate_vcf:
-    input:
-        vcf = rules.get_sample_vcf.output,
-        snpEff_database = rules.make_snpEff_db.output,
-    output:
-        protected('analysis/samples/{sample}/vcf.annotated.bcf')
-    #conda:
-    #    "envs/snpEff.yaml"
-    shell:
-        "snpEff "
-
-
-rule merge_vcfs:
-    input:
-        expand(rules.annotate_vcf.output, sample = config['samples'].keys())
-    output:
-        protected('analysis/all_variants.bcf')
-    conda:
-        "envs/bcftools.yaml"
-    shell:
-        "bcftools merge -Oz {input} -m+ > {output}"
+'''

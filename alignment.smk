@@ -1,90 +1,8 @@
-import os
-import glob
-
-download_url = '"https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{genome}/download?include_annotation_type=GENOME_FASTA,GENOME_GFF,RNA_FASTA,CDS_FASTA,PROT_FASTA,SEQUENCE_REPORT&filename={genome}.zip"'
-
-rule download_genome:
-    output:
-        temp('{genome}.zip')
-    params:
-        url = lambda wildcards : download_url.format(genome = wildcards.genome)
-    group: 'download'
-    shell:
-        'curl -OJX GET {params.url} -H "Accept: application/zip"'
-
-ncbi_fasta_name = 'genomes/{genome}/{genome}_{name}_genomic.fna'
 
 
-rule move_genome:
-    input:
-        rules.download_genome.output
-    output:
-        _dir = directory('genomes/{genome}'),
-        gff = 'genomes/{genome}/genomic.gff',
-        fasta = 'genomes/{genome}/genomic.fna'
-    group: 'download'
-    params:
-        fasta_download = lambda wildcards : ncbi_fasta_name.format(genome = wildcards.genome, name = "*"),
-    shell:
-        'mkdir -p genomes/tmp/{wildcards.genome} && mkdir -p genomes/{wildcards.genome} && '
-        'unzip {wildcards.genome}.zip -d genomes/tmp/{wildcards.genome} && '\
-        'mv genomes/tmp/{wildcards.genome}/ncbi_dataset/data/{wildcards.genome}/* genomes/{wildcards.genome}/ && '
-        'mv {params.fasta_download} {output.fasta}'
-
-
-rule merge_annotations:
-    input:
-        fastas = expand(rules.move_genome.output.fasta, 
-            genome = [metadata['reference'] for species, metadata in config['genomes'].items()]
-        ),
-        gff = expand(rules.move_genome.output.gff, 
-            genome = [metadata['reference'] for species, metadata in config['genomes'].items()]
-        )
-    output:
-        fasta = 'genomes/fasta.fna',
-        gff = 'genomes/gff.gff'
-    group : "merge-genomes"
-    shell:
-        "cat {input.fastas} > {output.fasta} && cat {input.gff} | grep -v '#' > {output.gff}"
-
-
-rule summarize_genomes:
-    input:
-        rules.merge_annotations.output.fasta,
-    output:
-        index = protected('genomes/fasta.fna.fai'),
-        chromsizes = protected('genomes/fasta.chromsizes'),
-        dict = protected('genomes/fasta.dict'),
-    conda:
-        "envs/samtools.yaml"
-    group: "merge-genomes"
-    shell:
-        "samtools faidx {input} && "
-        "cut -f1,2 {output.index} > {output.chromsizes} && "
-        "samtools dict {input} -o {output.dict}"
-
-
-def get_reference(wildcards):
-    if 'reference' in config:
-        return config['reference']
-    else:
-        return rules.merge_annotations.output.fasta
-
-
-def get_gff(wildcards):
-    if 'gff' in config:
-        return config['gff']
-    else:
-        return rules.merge_annotations.output.gff
-
-
-rule testrule:
-    output: "test.txt"
-    conda : "envs/bowtie2.yaml"
-    shell : "echo 'this' > {output}"
-
+# Construct the bowtie index for alignment.
+# 
 index_prefix = 'index/bowtie2_index.bt2'
-
 rule make_index:
     input:
         get_reference
@@ -110,10 +28,10 @@ rule trim_reads_paired:
         r1 = lambda wildcards: config['samples'][wildcards.sample]['read1'],
         r2 = lambda wildcards: config['samples'][wildcards.sample]['read2']
     output:
-        r1 = temp('temp/fastq/{sample}_R1.trim.fastq.gz'),
-        r2 = temp('temp/fastq/{sample}_R2.trim.fastq.gz'),
-        unmatched1 = temp('temp/fastq/{sample}_R1.trim.unpaired.fastq.gz'),
-        unmatched2 = temp('temp/fastq/{sample}_R2.trim.unpaired.fastq.gz'),
+        r1 = temp('processing/fastq/{sample}_R1.trim.fastq.gz'),
+        r2 = temp('processing/fastq/{sample}_R2.trim.fastq.gz'),
+        unmatched1 = temp('processing/fastq/{sample}_R1.trim.unpaired.fastq.gz'),
+        unmatched2 = temp('processing/fastq/{sample}_R2.trim.unpaired.fastq.gz'),
     log:
         'logs/trim/{sample}.trim.log'
     conda:
@@ -139,7 +57,7 @@ rule trim_reads_unpaired:
     input:
         lambda wildcards: config['samples'][wildcards.sample]['read1']
     output:
-        temp('temp/fastq/{sample}.trim.fastq.gz')
+        temp('processing/fastq/{sample}.trim.fastq.gz')
     log:
         'logs/trim/{sample}.trim.log'
     conda:
@@ -157,8 +75,7 @@ rule trim_reads_unpaired:
         trimmomatic \
             SE {input} {output} \
             ILLUMINACLIP:{params.adapters}:2:30:10 \
-            MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 \
-            && sleep 10 && du -sh {output} > {log}
+            MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20
         """
 
 
@@ -167,7 +84,8 @@ rule align_pe:
         reads = rules.trim_reads_paired.output,
         index = rules.make_index.output
     output:
-        'temp/align/{sample}-pe.sam'
+        sam = 'processing/align/{sample}-pe.sam',
+        stats = 'QC/samples/{sample}/flagstat.txt'
     log:
         'logs/align/{sample}.sam.log'
     conda:
@@ -186,8 +104,8 @@ rule align_pe:
             -x {params.index} \
             -1 {input.reads[0]} -2 {input.reads[1]} \
             --threads {threads} \
-            --very-sensitive -a --no-unal -S {output} \
-            && sleep 10 && du -sh {output} > {log}
+            --very-sensitive -a --no-unal -S {output.sam} 2> {log} \
+        && samtools flagstat {output.sam} > {output.stats}
         """
 
 
@@ -196,7 +114,7 @@ rule align_se:
         reads = rules.trim_reads_unpaired.output,
         index = rules.make_index.output,
     output:
-        temp('temp/align/{sample}-se.sam')
+        temp('processing/align/{sample}-se.sam')
     log:
         'logs/align/{sample}.sam.log'
     conda:

@@ -1,0 +1,16 @@
+name: metaCNV
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - bedtools=2.31.0
+  - hmmlearn=0.3.0
+  - numpy=1.25.2
+  - pandas=2.0.3
+  - patsy=0.5.3
+  - pybigwig=0.3.22
+  - pyfaidx=0.7.2.1
+  - scipy=1.11.1
+  - tabix=1.11

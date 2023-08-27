@@ -1,8 +1,8 @@
-name: bowtie2
+name: snpEff
 channels:
   - bioconda
   - conda-forge
   - defaults
 dependencies:
-  - bowtie2=2.5.1
-  - samtools=1.17
+  - snpeff=5.1
+  - bcftools=1.17

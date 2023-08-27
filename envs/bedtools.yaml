@@ -1,0 +1,9 @@
+name: bedtools
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - samtools=1.17
+  - bedtools=2.31.0
+  - ucsc-bedgraphtobigwig=445
