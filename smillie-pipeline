@@ -1,8 +1,9 @@
-##!usr/local/python3
+#!/usr/bin/env python3
 
 import subprocess
 import os
 import argparse
+import sys
 
 #CLUSTER_SUBMIT_STRING = 'qsub -j y -l h_vmem={mem_mb} -l h_rt={runtime} -pe smp {threads} -P broad'
 
@@ -15,18 +16,7 @@ def check_file_exists(filename):
 
 def get_parser():
     
-    parser = argparse.ArgumentParser("""
-Command to run metagenomics pipeline. This script wraps a snakemake pipeline, which handles
-jobs scheduling and submissions to the cluster. You can modify the behavior of the snakemake pipeline
-by passing snakemake arguements following the \"-s\" flag. Useful arguemnts are:
-
---dryrun: Print out the jobs that would be run without actually running them.
---batch [int]/[int]: Process this fraction of the total jobs.
---resources mem_mb=80000: Set upper limit on resources
---rerun-incomplete: Rerun jobs that failed or were interrupted.
---keep-going: Keep going if a job fails.
-\n                                     
-    """)
+    parser = argparse.ArgumentParser("Command to run metagenomics pipeline")
 
     subparser = parser.add_subparsers(dest='command')
 
@@ -44,10 +34,10 @@ by passing snakemake arguements following the \"-s\" flag. Useful arguemnts are:
         argument_group.add_argument('--cores', '-c', type = int, default=1,)
         argument_group.add_argument('--unlock', action='store_true', default=False,
                                 help = 'Unlock working directory')
-        argument_group.add_argument('--snake-args', '-s', nargs = argparse.REMAINDER, 
-                                help = 'Arguments to pass to snakemake')
         argument_group.add_argument('--adapters', '-a', type = check_file_exists, required=True,
                                 help = 'Path to illumina adapters fasta file')
+        argument_group.add_argument('--snake-args', '-s', nargs = argparse.REMAINDER, 
+                                help = 'Arguments to pass to snakemake')
     
 
     buildref_subparser = subparser.add_parser('build-ref', help = 'Download genomes and create indexes for various tools.')
@@ -65,16 +55,18 @@ by passing snakemake arguements following the \"-s\" flag. Useful arguemnts are:
     return parser
 
 
-if __name__ == "__main__":
-    
-    args = get_parser().parse_args()
+def main(args):
 
-    snakefile = os.path.join(__file__, 'controller.smk')
+    snakepath = os.path.dirname(os.path.abspath(__file__))
+
+    snakefile = os.path.join(snakepath, 'rules', 'controller.smk')
+    profile = os.path.join(snakepath, 'default_configs')
+    scripts_path = os.path.join(snakepath, 'programs')
 
     command = [
         'snakemake',
-        '--profile profile',
-        '-s', 'controller.smk',
+        '--profile', profile,
+        '-s', snakefile,
     ]
 
     if not args.local:
@@ -86,7 +78,6 @@ if __name__ == "__main__":
 
         for k, v in cluster_options.items():
             command.extend([f'--{k}', str(v)])
-
 
     if args.unlock:
         command.append('--unlock')
@@ -108,6 +99,7 @@ if __name__ == "__main__":
     def add_snake_arg(key, value):
         command.append(f'{key}={value}')
 
+    add_snake_arg('_external_scripts', scripts_path)
     add_snake_arg('_run_pipeline', args.run)
     
     try:
@@ -122,10 +114,21 @@ if __name__ == "__main__":
  /        \  Y Y  \  |  |_|  |_|  \  ___/|    |   |  |  |_> >  ___/|  |_|  |   |  \  ___/ 
 /_______  /__|_|  /__|____/____/__|\___  >____|   |__|   __/ \___  >____/__|___|  /\___  >
         \/      \/                     \/            |__|        \/             \/     \/ 
-    """)
+    """, file = sys.stderr)
     
-    print('\nRunning the following snakemake command:\n' + ' '.join(map(str, command)))
+    print('\nRunning the following snakemake command:\n' + ' '.join(map(str, command)), file = sys.stderr)
 
     subprocess.run(
         ' '.join(command), shell = True,
     )
+
+if __name__ == "__main__":
+    
+    try:
+        args = get_parser().parse_args()  
+        args.local
+    except AttributeError:
+        print(get_parser().format_help(), file = sys.stderr)
+    else:
+        main(args)
+    
