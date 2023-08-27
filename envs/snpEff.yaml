@@ -1,8 +1,0 @@
-name: snpEff
-channels:
-  - bioconda
-  - conda-forge
-  - defaults
-dependencies:
-  - snpeff=5.1
-  - bcftools=1.17

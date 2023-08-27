@@ -1,10 +1,14 @@
 samples:
-  '1':
+  'UMCG3299495':
     is_paired: TRUE
-    read1 : /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R1.fastq.gz
-    read2: /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R2.fastq.gz
+    read1 : realdata/prism1.UMCG3299495_R1.fastq.gz
+    read2: realdata/prism1.UMCG3299495_R2.fastq.gz
+    metadata: 
+      disease : IBD
+      subject : 134
+      cohort : PRISM
 
 groups:
   'A':
-    - '1'
+    - 'UMCG3299495'
 

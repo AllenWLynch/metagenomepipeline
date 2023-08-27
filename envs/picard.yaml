@@ -1,8 +1,0 @@
-name: picard
-channels:
-  - bioconda
-  - conda-forge
-  - defaults
-dependencies:
-  - picard-slim=3.0.0
-  - samtools=1.17

@@ -1,19 +1,11 @@
 
 
 
-adapter_fa : /broad/smillie-data/db/adapters/adapters.mgx.fa
-phylogeny_genes : 
-  - dnaG
-  - dnaN
-  - fusA
-  - groL
-  - gyrB
-
-
-#reference: data/reference.fa
-#gff: data/genes.gff
-
 genomes:
-  Dorie:
+  #Bacteroides fragilis:
+  #  reference : GCF_016889925.1
+  Blautia wexlerae:
+    reference : GCF_025148125.1
+  Bacteroides dorie:
     reference : GCF_902387545.1
   

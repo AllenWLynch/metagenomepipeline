@@ -1,8 +1,0 @@
-name: freebayes
-channels:
-  - bioconda
-  - conda-forge
-  - defaults
-dependencies:
-  - bcftools=1.17
-  - freebayes=1.3.2
