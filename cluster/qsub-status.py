@@ -5,8 +5,14 @@ import re
 from pathlib import Path
 import time
 import yaml
+import os
 
-cluster_config = yaml.safe_load(Path("cluster/cluster.yaml").read_text())
+configpath = os.path.join(
+    os.path.abspath(os.path.dirname(__file__)),
+    'cluster.yaml'
+)
+
+cluster_config = yaml.safe_load(Path(configpath).read_text())
 
 # get directory for checking for jobs before resorting to qacct
 CLUSTER_DIR = Path(cluster_config['cluster_dir'])

@@ -29,8 +29,14 @@ from pathlib import Path  # for path manipulation
 from snakemake.utils import read_job_properties  # get info from jobscript
 from snakemake.shell import shell  # to run shell command nicely
 import yaml
+import os
 
-cluster_config = yaml.safe_load(Path("cluster/cluster.yaml").read_text())
+configpath = os.path.join(
+    os.path.abspath(os.path.dirname(__file__)),
+    'cluster.yaml'
+)
+
+cluster_config = yaml.safe_load(Path(configpath).read_text())
 
 # get the jobscript (last argument)
 jobscript = sys.argv[-1]
