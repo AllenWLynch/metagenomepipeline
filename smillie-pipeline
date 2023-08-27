@@ -71,9 +71,9 @@ def main(args):
 
     if not args.local:
         cluster_options = {
-            'cluster': "cluster/qsub-submit.py",
-            'cluster-status': "cluster/qsub-status.py",
-            'jobscript': "cluster/qsub-jobscript.sh",
+            'cluster': os.path.join(snakepath, 'cluster', 'qsub-submit.py'),
+            'cluster-status': os.path.join(snakepath, 'cluster', 'qsub-status.py'),
+            'jobscript': os.path.join(snakepath, 'cluster', 'qsub-jobscript.sh')
         }
 
         for k, v in cluster_options.items():
