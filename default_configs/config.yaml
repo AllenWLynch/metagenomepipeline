@@ -11,5 +11,6 @@ use-conda: True
 use-singularity: False
 jobs: 100
 printshellcmds: True
-restart-times: 1
+restart-times: 2
 default-resources: [mem_mb=2048, runtime="10m"]
+

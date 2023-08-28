@@ -13,7 +13,7 @@ rule htseq_count:
         temp('analysis/samples/{sample}/feature_counts/{genome}_htseq.counts')
     resources:
         mem_mb = double_on_failure(config['resources']['htseq_count']['mem_mb']),
-        runtime = double_on_failure(config['resources']['htseq_count']['runtime'])
+        runtime = double_on_failure_time(config['resources']['htseq_count']['runtime'])
     threads: 1
     conda:
         'envs/htseq.yaml'
@@ -61,7 +61,7 @@ rule bamcoverage:
         bigwig = 'analysis/samples/{sample}/coverage.bigwig'
     resources:
         mem_mb = double_on_failure(config['resources']['bamcoverage']['mem_mb']),
-        runtime = double_on_failure(config['resources']['bamcoverage']['runtime'])
+        runtime = double_on_failure_time(config['resources']['bamcoverage']['runtime'])
     threads: config['resources']['bamcoverage']['threads']
     conda:
         'envs/bedtools.yaml'
@@ -90,7 +90,7 @@ rule call_cnvs_and_ptrs:
         cnv_deviations = cnv_outprefix + '.deviations.bed',
     resources:
         mem_mb = double_on_failure(config['resources']['call_cnvs_and_ptrs']['mem_mb']),
-        runtime = double_on_failure(config['resources']['call_cnvs_and_ptrs']['runtime'])
+        runtime = double_on_failure_time(config['resources']['call_cnvs_and_ptrs']['runtime'])
     threads: 1
     conda:
         "envs/metaCNV.yaml"
@@ -130,7 +130,7 @@ rule callvariants:
         cnv_profile = 'analysis/groups/{group}/cnv_profile.bed',
     resources:
         mem_mb = double_on_failure(config['resources']['callvariants']['mem_mb']),
-        runtime = double_on_failure(config['resources']['callvariants']['runtime'])
+        runtime = double_on_failure_time(config['resources']['callvariants']['runtime'])
     threads: config['resources']['callvariants']['threads']
     log:
         'logs/freebayes/{group}.log'
@@ -197,7 +197,7 @@ rule merge_vcfs:
         "logs/merge_vcfs.log"
     resources:
         mem_mb = double_on_failure(config['resources']['merge_vcfs']['mem_mb']),
-        runtime = double_on_failure(config['resources']['merge_vcfs']['runtime'])
+        runtime = double_on_failure_time(config['resources']['merge_vcfs']['runtime'])
     threads: config['resources']['merge_vcfs']['threads']
     shell:
         "bcftools merge {input} -Ov > {output} 2> {log}"
@@ -242,7 +242,7 @@ rule annotate_vcf:
         'benchmark/annotate_vcf.tsv'
     resources:
         mem_mb = double_on_failure(config['resources']['annotate_vcf']['mem_mb']),
-        runtime = double_on_failure(config['resources']['annotate_vcf']['runtime'])
+        runtime = double_on_failure_time(config['resources']['annotate_vcf']['runtime'])
     threads: config['resources']['annotate_vcf']['threads']
     params:
         config = 'analysis/snpEff/snpEff.config',

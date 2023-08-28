@@ -11,7 +11,7 @@ rule make_index:
         directory('processing/index/')
     resources:
         mem_mb = double_on_failure(config['resources']['index']['mem_mb']),
-        runtime = double_on_failure(config['resources']['index']['runtime'])
+        runtime = double_on_failure_time(config['resources']['index']['runtime'])
     threads:
         config['resources']['index']['threads']
     conda:
@@ -45,7 +45,7 @@ rule trim_reads_paired:
         'envs/trimmomatic.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['trimmomatic']['mem_mb']),
-        runtime = double_on_failure(config['resources']['trimmomatic']['runtime'])
+        runtime = double_on_failure_time(config['resources']['trimmomatic']['runtime'])
     threads: config['resources']['trimmomatic']['threads']
     log:
         'logs/trim/{sample}.log'
@@ -73,7 +73,7 @@ rule trim_reads_unpaired:
         'envs/trimmomatic.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['trimmomatic']['mem_mb']),
-        runtime = double_on_failure(config['resources']['trimmomatic']['runtime'])
+        runtime = double_on_failure_time(config['resources']['trimmomatic']['runtime'])
     threads: config['resources']['trimmomatic']['threads']
     message:
         'Trimming reads for SE sample {wildcards.sample}'
@@ -99,7 +99,7 @@ rule align_pe:
         'envs/bowtie2.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['bowtie']['mem_mb']),
-        runtime = double_on_failure(config['resources']['bowtie']['runtime'])
+        runtime = double_on_failure_time(config['resources']['bowtie']['runtime'])
     threads: config['resources']['bowtie']['threads']
     log:
         'logs/align/{sample}.log'
@@ -128,7 +128,7 @@ rule align_se:
         'envs/bowtie2.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['bowtie']['mem_mb']),
-        runtime = double_on_failure(config['resources']['bowtie']['runtime'])
+        runtime = double_on_failure_time(config['resources']['bowtie']['runtime'])
     threads: config['resources']['bowtie']['threads']
     log:
         'logs/align/{sample}.log'
