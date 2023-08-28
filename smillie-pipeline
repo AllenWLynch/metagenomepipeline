@@ -79,6 +79,8 @@ def main(args):
         for k, v in cluster_options.items():
             command.extend([f'--{k}', str(v)])
 
+        #print(cluster_options['cluster'])
+
     if args.unlock:
         command.append('--unlock')
 

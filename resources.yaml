@@ -2,38 +2,33 @@
 resources:
 
   index:
-    mem_mb: 8000
-    runtime: 30m
+    mem_mb: 1000
+    runtime: 10m
     threads: 1
 
   trimmomatic:
-    mem_mb: 8000
+    mem_mb: 2000
     runtime : 1h
     threads: 1
 
   bowtie:
-    mem_mb: 16000
-    runtime: 12h
+    mem_mb: 1000
+    runtime: 20m
     threads: 8
 
   sort:
-    mem_mb: 16000
-    runtime: 12h
+    mem_mb: 2000
+    runtime: 5m
     threads: 8
 
-  filter:
+  markduplicates:
     mem_mb: 2000
     runtime: 1h
-    threads: 1
-
-  markduplicates:
-    mem_mb: 16000
-    runtime: 12h
     threads: 1
     
   htseq_count:
     mem_mb: 2000
-    runtime: 4h
+    runtime: 10m
     threads: 1
 
   callvariants:

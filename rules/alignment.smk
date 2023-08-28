@@ -25,6 +25,12 @@ rule make_index:
     shell:
         'mkdir -p processing/index && bowtie2-build {input} {params.index_prefix} > {log} 2>&1'
 
+rule test:
+    output:
+        "test.txt"
+    shell:
+        "echo HERE > {output}"
+
 
 rule trim_reads_paired:
     input:

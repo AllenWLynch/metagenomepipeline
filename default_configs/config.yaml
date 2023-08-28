@@ -6,10 +6,10 @@ cores : 100
 max-jobs-per-second: 10
 max-status-checks-per-second: 10
 local-cores: 1
-latency-wait: 5
+latency-wait: 60
 use-conda: True
 use-singularity: False
 jobs: 100
 printshellcmds: True
-restart-times: 0
+restart-times: 1
 default-resources: [mem_mb=2048, runtime="10m"]
