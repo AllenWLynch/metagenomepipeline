@@ -20,7 +20,7 @@ rule get_dominant_strain_genotype:
         """
         bcftools filter --IndelGap 5 {input} --regions {input.regions} | \
         bcftools norm -m- | \
-        bcftools view -i 'AF>0.5' -Oz > {output.vcf} \
+        bcftools view -i 'FORMAT/AO>(0.5*INFO/DP)' -Oz > {output.vcf} \
         && bcftools index {output.vcf} && \
         samtools faidx <(cat {input.regions}) {params.regions_list} | \
         bcftools consensus -s - -f - {output.vcf} > {output.consensus}

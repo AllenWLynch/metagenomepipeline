@@ -1,12 +1,29 @@
 
+import re
+
 genomes_list = [metadata['reference'] for species, metadata in config['genomes'].items()]
 samples_list = list(config['samples'].keys())
 
 def double_on_failure(base_resources):
     def _double_on_failure(wildcards, attempt):
-        return base_resources * attempt
-
+        return base_resources * 2**(attempt - 1)
     return _double_on_failure
+
+
+def double_on_failure_time(base_time):
+
+    match = re.match(r'(\d+)([smhd])', base_time)
+    if not match:
+        raise ValueError("Invalid input format")
+
+    value, unit = match.groups()
+    value = int(value)
+
+    def _double_on_failure_time(wildcards, attempt):
+        return f'{int(value * 2**(attempt - 1))}{unit}'
+    
+    return _double_on_failure_time
+
 
 include: "genomes.smk"
 # Define conveniance methods for accessing the fasta and gff files for downstream analysis.

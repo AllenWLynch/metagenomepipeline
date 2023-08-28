@@ -12,7 +12,7 @@ rule sort:
         'envs/samtools.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['sort']['mem_mb']),
-        runtime = double_on_failure(config['resources']['sort']['runtime']),
+        runtime = double_on_failure_time(config['resources']['sort']['runtime']),
     threads: config['resources']['sort']['threads']
     log:
         'logs/sort/{sample}.log'
@@ -31,7 +31,7 @@ rule markduplicates:
         'envs/picard.yaml'
     resources:
         mem_mb = double_on_failure(config['resources']['markduplicates']['mem_mb']),
-        runtime = double_on_failure(config['resources']['markduplicates']['runtime'])
+        runtime = double_on_failure_time(config['resources']['markduplicates']['runtime'])
     threads: config['resources']['markduplicates']['threads']
     log:
         'logs/markdups/{sample}.log'
