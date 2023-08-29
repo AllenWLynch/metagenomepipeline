@@ -24,6 +24,9 @@ def double_on_failure_time(base_time):
     
     return _double_on_failure_time
 
+### DELETE THIS !!! ##
+# config['groups'] = {group_id : samples for group_id, samples in config['groups'].items() if len(samples) == 1}
+###
 
 include: "genomes.smk"
 # Define conveniance methods for accessing the fasta and gff files for downstream analysis.

@@ -119,7 +119,7 @@ rule call_cnvs_and_ptrs:
             --fasta {input.fasta} \
             --bigwig {input.bigwig} \
             --ori {input.ori} \
-            --outprefix {params.outprefix} 2> {log} && \
+            --outprefix {params.outprefix} && \
         \
         gunzip -c {output.cnv_calls} | \
             awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,\"{wildcards.sample}\",$4}}' > {output.cnv_deviations}
