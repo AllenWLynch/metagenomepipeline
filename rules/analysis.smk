@@ -107,10 +107,10 @@ rule call_cnvs_and_ptrs:
             --fasta {input.fasta} \
             --bigwig {input.bigwig} \
             --ori {input.ori} \
-            --outprefix {params.outprefix} 2> {log} && \
+            --outprefix {params.outprefix} && \
         \
         gunzip -c {output.cnv_calls} | \
-            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,{wildcards.sample},$4}}' > {output.cnv_deviations}
+            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,\"{wildcards.sample}\",$4}}' > {output.cnv_deviations}
         """
 
 
@@ -159,7 +159,7 @@ rule callvariants:
             --min-alternate-fraction 0.01 \
             --haplotype-length 3 \
             --allele-balance-priors-off \
-            --report-genotype-likelihood-max > {output.vcf} 2> {log}
+            --report-genotype-likelihood-max > {output.vcf}
         """
 
 
