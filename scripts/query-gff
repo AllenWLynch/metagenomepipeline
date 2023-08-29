@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import os
+
+GFF_COLS = ['chr', 'source', 'type', 'start', 'end', 'score', 'strand', 'phase', 'attributes']
+GFF_KEYS = dict(zip(GFF_COLS, range(len(GFF_COLS)))) 
+
+
+def parse_gff(gff_file,
+              delim = '\t',
+):
+    for line in gff_file:
+        if not line.startswith('#'):
+            
+            record = dict(zip(GFF_COLS, line.strip().split(delim)))
+
+            attributes = record['attributes']
+            record['attributes'] = dict([x.split('=') for x in attributes.split(';')]) # split attributes into key-value pairs
+            
+            record['attributes']['all'] = attributes # add back the original attributes string for reference with "attributes[all]"
+
+            yield record
+
+
+def filter_gff(gff_parser, 
+              type_filter = None, 
+              attribute_key = None,
+              attribute_values = None,
+):
+   
+    if attribute_key and attribute_values:
+        if isinstance(attribute_values, str):
+            attribute_values = [attribute_values]
+        elif len(attribute_values) > 0:
+            attribute_values = list(map(str, attribute_values))
+
+    for record in gff_parser:
+
+        if type_filter is None or record['type'] == type_filter:
+            
+            if attribute_key is None or \
+                (attribute_key in record['attributes'] and \
+                 ((attribute_values is None) or record['attributes'][attribute_key] in attribute_values)):
+                yield record
+                
+
+def format_record(
+        gff_parser, 
+        format_str = '{chr}\t{start}\t{end}\t{attributes[ID]}\n',
+        outfile = sys.stdout,
+):
+
+    accepted_records = 0
+    for record in gff_parser:
+        try:
+            print(format_str.format(**record), end = '', file = outfile)
+            accepted_records+=1
+        except KeyError as err:
+            print('ERROR: The following attribute was not found in the GFF record: ' + str(err), file = sys.stderr)
+            sys.exit(1)
+
+    if accepted_records == 0:
+        print('ERROR: No records were found matching the specified criteria', file = sys.stderr)
+        sys.exit(1)
+
+
+def main(args, format_str):
+
+    gff_parser = parse_gff(args.input)
+    
+    if args.type_filter or args.attribute_key:
+
+        gff_parser = filter_gff(gff_parser, 
+                                type_filter=args.type_filter, 
+                                attribute_key=args.attribute_key, 
+                                attribute_values=args.attribute_values
+                                )
+
+    format_record(gff_parser, 
+                  format_str=format_str, 
+                  outfile=args.output
+    )
+
+
+def get_parser():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input','-i', type=argparse.FileType('r'), default=sys.stdin)
+    parser.add_argument('--output','-o', type=argparse.FileType('w'), default=sys.stdout)
+    parser.add_argument('--type-filter', '-type', default=None)
+    parser.add_argument('--attribute-key', '-attr', default=None)
+    parser.add_argument('--attribute-values', '-vals', nargs='+', default=None)
+
+    format_group = parser.add_mutually_exclusive_group()
+    format_group.add_argument('--format-str','-f', default='{chr}\t{start}\t{end}\t{attributes[ID]}\n')
+    format_group.add_argument('--bed','-bed', action='store_true')
+    format_group.add_argument('--regions','-regions', action='store_true', default = False)
+    format_group.add_argument('--gff','-gff', action='store_true')
+
+    return parser
+
+if __name__ == '__main__':
+
+    args = get_parser().parse_args()
+
+    #if args.attribute_key and len(args.attribute_values) == 0:
+    #    print('ERROR: You must specify attribute values when filtering by attribute key', file = sys.stderr)
+    #    sys.exit(1)
+
+    if args.bed:
+        format_str = '{chr}\t{start}\t{end}\t{attributes[ID]}\n'
+    elif args.regions:
+        format_str = '{chr}:{start}-{end}\n'
+    elif args.gff:
+        format_str = '{chr}\t{source}\t{type}\t{start}\t{end}\t{score}\t{strand}\t{phase}\t{attributes[all]}\n'
+    else:
+        format_str = args.format_str
+
+    format_str = format_str.encode().decode('unicode_escape')
+
+    try:
+        main(args, format_str)
+    except BrokenPipeError:
+        sys.stderr.close()
+        sys.stdout.close()
+        sys.exit(0)
+
+
