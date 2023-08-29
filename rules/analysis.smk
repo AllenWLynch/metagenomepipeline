@@ -1,31 +1,34 @@
 from math import sqrt, log10
 
-
 ## Section 1 - species abundances
 #  Count the number of mapped reads falling on each "gene" feature in the gff
 #  Save genes x counts for each genome in a separate file
 ##
-rule htseq_count:
+rule feature_counts:
     input:
        bam = rules.markduplicates.output,
        gff = rules.move_genome.output.gff,
     output:
-        temp('analysis/samples/{sample}/feature_counts/{genome}_htseq.counts')
+        'analysis/samples/{sample}/feature_counts/{genome}.tsv'
     resources:
         mem_mb = double_on_failure(config['resources']['htseq_count']['mem_mb']),
         runtime = double_on_failure_time(config['resources']['htseq_count']['runtime'])
     threads: 1
     conda:
-        'envs/htseq.yaml'
+        'envs/subread.yaml'
     log:
-        'logs/htseq_count/{sample}_{genome}.log'
+        'logs/feature_count/{sample}_{genome}.log'
     benchmark:
-        'benchmark/htseq_count/{sample}_{genome}.tsv'
+        'benchmark/feature_count/{sample}_{genome}.tsv'
+    params:
+        scripts = config['_external_scripts']
+    group:
+        "{sample}_counting"
     shell:
         """
-        cat {input.gff} | grep ";gene=" > {input.gff}.tmp && \
-        htseq-count -i gene -r pos -s no -a 0 --secondary-alignments ignore -t gene \
-            {input.bam} {input.gff}.tmp > {output} 2> {log} &&
+        python {params.scripts}/query-gff -i {input.gff} -type gene -attr gene -gff > {input.gff}.tmp && \
+        featureCounts -a {input.gff}.tmp -o {output} -t gene -g gene \
+            -Q 0 --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1 &&
         rm {input.gff}.tmp
         """
 
@@ -34,19 +37,28 @@ rule htseq_count:
 #
 rule summarize_abundances:
     input:
-        gene_counts = lambda w :expand(rules.htseq_count.output, genome = genomes_list, sample = w.sample)
+        gene_counts = lambda w :expand(rules.feature_counts.output, genome = genomes_list, sample = w.sample)
     output:
-        'analysis/samples/{sample}/gene_counts.tsv'
+        'analysis/samples/{sample}/feature_counts.tsv'
     params:
         genomes = genomes_list
     run:
         import pandas as pd
+
+        def format_featurecounts_output(filename, genome):
+            df = pd.read_csv(filename, sep = '\t', skiprows = 1).iloc[:,[0,-1]]\
+                .drop_duplicates(subset = ['Geneid'])
+
+            df = df.rename(columns = {'Geneid' : 'gene', df.columns[-1] : genome})\
+                .set_index('gene')
+            return df
+
         pd.concat([
-                pd.read_csv(filename, sep = '\t', header = None, names = ['gene', genome]).set_index('gene')
+                format_featurecounts_output(filename, genome)
                 for genome, filename in zip(params.genomes, input.gene_counts)
             ], axis = 1,
         ).fillna(0.).to_csv(output[0], sep = '\t')
-    
+
 
 ## Section 2
 #
@@ -72,7 +84,7 @@ rule bamcoverage:
     shell:
         """
         samtools view -q 0 -b -F 0x400 -F 0x100 -F 0x800 {input.bam} | \
-        bedtools genomecov -ibam - -bga > {output.bedgraph} 2> {log} && \
+        bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         """
 
@@ -110,7 +122,7 @@ rule call_cnvs_and_ptrs:
             --outprefix {params.outprefix} 2> {log} && \
         \
         gunzip -c {output.cnv_calls} | \
-            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,{wildcards.sample},$4}}' > {output.cnv_deviations}
+            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,\"{wildcards.sample}\",$4}}' > {output.cnv_deviations}
         """
 
 
@@ -137,7 +149,7 @@ rule callvariants:
     benchmark:
         'benchmark/freebayes/{group}.tsv'
     params:
-        samples = lambda w : '-b ' + ' -b '.join(list_input_samples(w, rules.markduplicates.output[0])),
+        #samples = lambda w : '-b ' + ' -b '.join(list_input_samples(w, rules.markduplicates.output[0])),
         ploidy = 6, # We can assume that each *sample* is haploid at non-CNV loci, since there will probably be a genotypically dominant strain
                     # and most alleles will have AF=1. A pooled sample, however, will have potentially `n_samples`*1 haplotypes.
                     # Since CNV loci will appear to have greater allelic diversity due to duplicated/paralogous sequence mapping, 
@@ -149,7 +161,7 @@ rule callvariants:
         """
         cat {input.cnv_calls} | awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' > {output.cnv_profile} && \
         \
-        freebayes -f {input.reference} {params.samples} \
+        freebayes -f {input.reference} \
             --ploidy {params.ploidy} \
             --cnv-map {output.cnv_profile} \
             --pooled-discrete \
@@ -159,7 +171,8 @@ rule callvariants:
             --min-alternate-fraction 0.01 \
             --haplotype-length 3 \
             --allele-balance-priors-off \
-            --report-genotype-likelihood-max > {output.vcf} 2> {log}
+            --report-genotype-likelihood-max \
+            {input.samples} > {output.vcf}
         """
 
 
@@ -255,7 +268,7 @@ rule get_sample_vcf:
     input:
         rules.annotate_vcf.output
     output:
-        protected('analysis/samples/{sample}/vcf.bcf')
+        temp('analysis/samples/{sample}/vcf.bcf')
     conda:
         "envs/bcftools.yaml"
     shell:

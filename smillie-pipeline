@@ -25,8 +25,6 @@ def get_parser():
         argument_group = parser.add_argument_group('Common arguments')
         argument_group.add_argument('--samples-config', '-samples', type = check_file_exists, required=True,
                         help = 'Specifies the samples and groups of samples to process')
-        argument_group.add_argument('--resources-config','-resources', type = check_file_exists, required=True,
-                                help = 'Specifies the resources to allocate to each job on cluster submission.')
         argument_group.add_argument('--sequences-config','-sequences', type = check_file_exists, required=True,
                                 help = 'Configuration file for sequences and annotations')
         argument_group.add_argument('--local', action = 'store_true', default=False,
@@ -61,7 +59,8 @@ def main(args):
 
     snakefile = os.path.join(snakepath, 'rules', 'controller.smk')
     profile = os.path.join(snakepath, 'default_configs')
-    scripts_path = os.path.join(snakepath, 'programs')
+    scripts_path = os.path.join(snakepath, 'scripts')
+    resources_config = os.path.join(snakepath, 'resources.yaml')
 
     command = [
         'snakemake',
@@ -73,25 +72,25 @@ def main(args):
         cluster_options = {
             'cluster': os.path.join(snakepath, 'cluster', 'qsub-submit.py'),
             'cluster-status': os.path.join(snakepath, 'cluster', 'qsub-status.py'),
-            'jobscript': os.path.join(snakepath, 'cluster', 'qsub-jobscript.sh')
+            'jobscript': os.path.join(snakepath, 'cluster', 'qsub-jobscript.sh'),
+            'cluster-cancel' : 'qdel'
         }
 
         for k, v in cluster_options.items():
             command.extend([f'--{k}', str(v)])
+    else:
+        command.extend(
+            ['--cores', str(args.cores), '--latency-wait', '5']
+        )
 
     if args.unlock:
         command.append('--unlock')
 
     if not args.snake_args is None:
-        command.extend( args.snake_args )
-
-    if args.local:
-        command.extend(
-            ['--cores', str(args.cores)]
-        )
+        command.extend( args.snake_args )        
 
     command.extend([
-        '--configfiles', args.samples_config, args.resources_config, args.sequences_config,
+        '--configfiles', args.samples_config, args.sequences_config, resources_config,
         '--config',
     ])
     

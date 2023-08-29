@@ -76,6 +76,6 @@ rule summarize_genomes:
         samtools faidx {input} && \
         cut -f1,2 {output.index} > {output.chromsizes} && \
         samtools dict {input} -o {output.dict} && \
-        bash {params.scripts}/bin/ORIfinder.sh \
+        bash {params.scripts}/ORIfinder \
             {input} {output.chromsizes} {output.gc_skew_bedgraph} > {output.oris}
         """

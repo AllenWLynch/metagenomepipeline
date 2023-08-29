@@ -45,3 +45,13 @@ rule markduplicates:
             M={log} > {log} 2>&1 && \
         samtools index {output}
         """
+
+rule index:
+    input:
+        rules.markduplicates.output
+    output:
+        'analysis/samples/{sample}/{sample}.bam.bai'
+    conda:
+        'envs/samtools.yaml'
+    shell:
+        "samtools index {input}"

@@ -1,9 +1,11 @@
 
-
+core_genes : [dnaA, rpoC]
 
 genomes:
-  #Bacteroides fragilis:
-  #  reference : GCF_016889925.1
+  Provatella:
+    reference : GCF_020735445.1
+  Phocaeicola massiliensis: 
+     reference : GCF_000382445.1
   Blautia wexlerae:
     reference : GCF_025148125.1
   Bacteroides dorie:
