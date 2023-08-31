@@ -7,6 +7,7 @@ from math import sqrt, log10
 rule feature_counts:
     input:
        bam = rules.markduplicates.output,
+       bamindex = rules.bam_index.output,
        gff = rules.move_genome.output.gff,
     output:
         'analysis/samples/{sample}/feature_counts/{genome}.tsv'
@@ -67,6 +68,7 @@ rule summarize_abundances:
 rule bamcoverage:
     input:
         bam = rules.markduplicates.output,
+        bamindex = rules.bam_index.output,
         chromsizes = rules.summarize_genomes.output.chromsizes
     output:
         bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
@@ -119,38 +121,59 @@ rule call_cnvs_and_ptrs:
             --fasta {input.fasta} \
             --bigwig {input.bigwig} \
             --ori {input.ori} \
-            --outprefix {params.outprefix} && \
+            --outprefix {params.outprefix} > {log} 2>&1 && \
         \
         gunzip -c {output.cnv_calls} | \
             awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,\"{wildcards.sample}\",$4}}' > {output.cnv_deviations}
         """
 
 
-def list_input_samples(w, rule):
-    return [rule.format(sample = sample)
-            for sample in config['groups'][w.group]
-           ]
+
+#######################################
+#######################################
+#######################################
+#######################################
+#######################################
+ploidy = 2
+#######################################
+#######################################
+#######################################
+#######################################
+
+
+rule aggregate_ploidy_changes:
+    input:
+        cnv_calls = expand(rules.call_cnvs_and_ptrs.output.cnv_deviations,
+                        sample = samples_list),
+    output:
+        temp('processing/variants/cnv_calls.bed')
+    params:
+        ploidy = ploidy
+    shell:
+        "cat {input.cnv_calls} | "
+        "awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' "
+        "> {output}"
+
+#wildcard_constraints:
+#    region='[a-zA-Z0-9]+:[0-9]+-[0-9]+',
 
 rule callvariants:
     input:
-        samples = lambda w : list_input_samples(w, rules.markduplicates.output[0]),
+        samples = expand(rules.markduplicates.output, sample = samples_list),
         reference = get_reference,
-        cnv_calls = lambda w : list_input_samples(w, rules.call_cnvs_and_ptrs\
-                                    .output.cnv_deviations),
+        cnv_calls = rules.aggregate_ploidy_changes.output,
     output:
-        vcf = 'analysis/groups/{group}/vcf.vcf',
-        cnv_profile = 'analysis/groups/{group}/cnv_profile.bed',
+        vcf = temp('processing/variants/{region}.vcf'),
     resources:
         mem_mb = double_on_failure(config['resources']['callvariants']['mem_mb']),
         runtime = double_on_failure_time(config['resources']['callvariants']['runtime'])
     threads: config['resources']['callvariants']['threads']
     log:
-        'logs/freebayes/{group}.log'
+        'logs/freebayes/{region}.log'
     benchmark:
-        'benchmark/freebayes/{group}.tsv'
+        'benchmark/freebayes/{region}.tsv'
     params:
-        #samples = lambda w : '-b ' + ' -b '.join(list_input_samples(w, rules.markduplicates.output[0])),
-        ploidy = 6, # We can assume that each *sample* is haploid at non-CNV loci, since there will probably be a genotypically dominant strain
+        ploidy = ploidy, # We can assume that each *sample* is haploid at non-CNV loci, since there will probably be a genotypically dominant strain
                     # and most alleles will have AF=1. A pooled sample, however, will have potentially `n_samples`*1 haplotypes.
                     # Since CNV loci will appear to have greater allelic diversity due to duplicated/paralogous sequence mapping, 
                     # the CNV map will help determine the ploidy to model at those loci.
@@ -159,11 +182,10 @@ rule callvariants:
         'envs/freebayes.yaml'
     shell:
         """
-        cat {input.cnv_calls} | awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' > {output.cnv_profile} && \
-        \
         freebayes -f {input.reference} \
+            --region {wildcards.region} \
             --ploidy {params.ploidy} \
-            --cnv-map {output.cnv_profile} \
+            --cnv-map {input.cnv_calls} \
             --pooled-discrete \
             --pooled-continuous \
             --use-best-n-alleles 6 \
@@ -176,34 +198,49 @@ rule callvariants:
         """
 
 
+checkpoint chunk_genome:
+    input:
+        rules.summarize_genomes.output.chromsizes,
+    output:
+        temp('genomes/windows.bed')
+    conda:
+        "envs/bedtools.yaml"
+    params:
+        window_size = 1000000
+    shell:
+        'bedtools makewindows -g {input} -w {params.window_size} > {output}'
+
+        
+def get_chunked_variant_calls(wildcards):
+
+    regions_file = checkpoints.chunk_genome.get(**wildcards).output[0]
+
+    with open(regions_file) as f:
+        regions = [
+            '{}:{}-{}'.format(*map(str, line.strip().split('\t')[:3])) 
+            for line in f
+        ]
+
+    return expand(
+        rules.callvariants.output.vcf, region = regions
+    ) 
+
+
 def fdr_to_qual(fdr):
     return int(-10 * log10(fdr))
-
-rule filter_variants:
-    input:
-        vcf = rules.callvariants.output.vcf,
-        reference = get_reference
-    output:
-        vcf = 'analysis/groups/{group}/vcf.filtered.bcf'
-    conda:
-        'envs/bcftools.yaml'
-    params:
-        samples = lambda w : config['groups'][w.group],
-        min_reads = 3,
-        qual = fdr_to_qual(0.01),
-    shell:
-        """
-        bcftools norm -f {input.reference} {input.vcf} | \
-        bcftools filter -i 'FMT/DP>={params.min_reads} && QUAL>={params.qual}' -Oz > {output.vcf} && \
-        bcftools index {output.vcf}
-        """
 
 
 rule merge_vcfs:
     input:
-        expand(rules.filter_variants.output.vcf, group = config['groups'].keys()),
+        vcfs = get_chunked_variant_calls,
+        reference = get_reference
     output:
-        temp('analysis/all/variants.vcf')
+        vcf = temp('analysis/all/vcf.filtered.bcf')
+    conda:
+        'envs/bcftools.yaml'
+    params:
+        min_reads = 3,
+        qual = fdr_to_qual(0.01),
     conda:
         "envs/bcftools.yaml"
     log:
@@ -213,7 +250,11 @@ rule merge_vcfs:
         runtime = double_on_failure_time(config['resources']['merge_vcfs']['runtime'])
     threads: config['resources']['merge_vcfs']['threads']
     shell:
-        "bcftools merge {input} -Ov > {output} 2> {log}"
+        """
+        bcftools concat {input.vcfs} | \
+        bcftools norm -D -f {input.reference} | \
+        bcftools filter -i 'FMT/DP>={params.min_reads} && QUAL>={params.qual}' -Ov > {output.vcf} 2> {log}
+        """
 
 
 rule make_snpEff_db:

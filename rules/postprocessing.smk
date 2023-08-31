@@ -1,6 +1,5 @@
 
 
-
 rule sort:
     input:
         lambda w : 'processing/align/{sample}-{endedness}.sam'.format(
@@ -46,7 +45,7 @@ rule markduplicates:
         samtools index {output}
         """
 
-rule index:
+rule bam_index:
     input:
         rules.markduplicates.output
     output:
@@ -55,3 +54,19 @@ rule index:
         'envs/samtools.yaml'
     shell:
         "samtools index {input}"
+
+
+rule get_multimap_stats:
+    input:
+        bam = rules.markduplicates.output,
+        contigs = get_contigs,
+    output:
+        stats = 'analysis/samples/{sample}/multimap_stats.tsv',
+        multimap_sam = 'analysis/samples/{sample}/multimap.sorted-by-name.sam',
+    conda:
+        "envs/samtools.yaml"
+    params:
+        scripts = config['_external_scripts']
+    shell:
+        "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
+        

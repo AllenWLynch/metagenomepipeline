@@ -37,6 +37,9 @@ def get_reference(wildcards):
 def get_gff(wildcards):
     return rules.merge_annotations.output.gff
 
+def get_contigs(wildcards):
+    return rules.merge_annotations.output.contigs
+
 
 include: "alignment.smk"
 include: "postprocessing.smk"
@@ -60,6 +63,7 @@ elif config['_run_pipeline'] == 'variants':
     targets = [
         rules.annotate_vcf.output,
         *expand(rules.summarize_abundances.output, sample = samples_list),
+        *expand(rules.get_multimap_stats.output.stats, sample = samples_list)
     ]
 
 
