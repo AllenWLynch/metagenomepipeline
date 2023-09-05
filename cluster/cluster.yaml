@@ -1,6 +1,6 @@
 
 latency_wait : 60
-default_mem_mb : 2048
+default_mem_mb : 4096
 reserve_min_threads : 4
 reserve_min_mem_mb : 8096
 cpu_hung_min_time : 1

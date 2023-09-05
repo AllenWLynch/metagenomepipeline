@@ -61,6 +61,8 @@ def main(args):
     profile = os.path.join(snakepath, 'default_configs')
     scripts_path = os.path.join(snakepath, 'scripts')
     resources_config = os.path.join(snakepath, 'resources.yaml')
+    parameters_config = os.path.join(snakepath, 'parameters.yaml')
+
 
     command = [
         'snakemake',
@@ -74,17 +76,15 @@ def main(args):
             'cluster': os.path.join(snakepath, 'cluster', 'qsub-submit.py'),
             'cluster-status': os.path.join(snakepath, 'cluster', 'qsub-status.py'),
             'jobscript': os.path.join(snakepath, 'cluster', 'qsub-jobscript.sh'),
-            'cluster-cancel' : 'qdel'
         }
 
         for k, v in cluster_options.items():
             command.extend([f'--{k}', str(v)])
     else:
         command.extend(
-            ['--cores', str(args.cores), '--latency-wait', '5']
+            ['--cores', str(args.cores), '--latency-wait', '5', '--restart-times', '0']
         )
 
-        #print(cluster_options['cluster'])
 
     if args.unlock:
         command.append('--unlock')
@@ -93,7 +93,7 @@ def main(args):
         command.extend( args.snake_args )        
 
     command.extend([
-        '--configfiles', args.samples_config, args.sequences_config, resources_config,
+        '--configfiles', args.samples_config, args.sequences_config, resources_config, parameters_config,
         '--config',
     ])
     
@@ -117,12 +117,11 @@ def main(args):
 /_______  /__|_|  /__|____/____/__|\___  >____|   |__|   __/ \___  >____/__|___|  /\___  >
         \/      \/                     \/            |__|        \/             \/     \/ 
     """, file = sys.stderr)
-    
-    print('\nRunning the following snakemake command:\n' + ' '.join(map(str, command)), file = sys.stderr)
 
     subprocess.run(
         ' '.join(command), shell = True,
     )
+
 
 if __name__ == "__main__":
     

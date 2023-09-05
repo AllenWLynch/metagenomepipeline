@@ -12,5 +12,5 @@ use-singularity: False
 jobs: 100
 printshellcmds: True
 restart-times: 2
-default-resources: [mem_mb=2048, runtime="10m"]
+default-resources: [mem_mb=4096, runtime="20m"]
 

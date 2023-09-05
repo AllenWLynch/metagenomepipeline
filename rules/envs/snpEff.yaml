@@ -5,4 +5,3 @@ channels:
   - defaults
 dependencies:
   - snpeff=5.1
-  - bcftools=1.17

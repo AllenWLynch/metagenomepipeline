@@ -22,14 +22,15 @@ rule feature_counts:
     benchmark:
         'benchmark/feature_count/{sample}_{genome}.tsv'
     params:
-        scripts = config['_external_scripts']
+        scripts = config['_external_scripts'],
+        quality = config['min_count_quality']
     group:
         "{sample}_counting"
     shell:
         """
         python {params.scripts}/query-gff -i {input.gff} -type gene -attr gene -gff > {input.gff}.tmp && \
         featureCounts -a {input.gff}.tmp -o {output} -t gene -g gene \
-            -Q 0 --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1 &&
+            -Q {params.quality} --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1 &&
         rm {input.gff}.tmp
         """
 
@@ -61,15 +62,15 @@ rule summarize_abundances:
         ).fillna(0.).to_csv(output[0], sep = '\t')
 
 
-## Section 2
-#
-#
+## Section 2 - CNV calling
+# Using information from the origin of replication and coverage,
+# Call CNVs and PTRs for each sample
 ##
 rule bamcoverage:
     input:
         bam = rules.markduplicates.output,
         bamindex = rules.bam_index.output,
-        chromsizes = rules.summarize_genomes.output.chromsizes
+        chromsizes = get_chromsizes,
     output:
         bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
         bigwig = 'analysis/samples/{sample}/coverage.bigwig'
@@ -83,9 +84,11 @@ rule bamcoverage:
         'logs/coverage/{sample}.log',
     benchmark:
         'benchmark/coverage/{sample}.tsv'
+    params:
+        quality = config['min_count_quality']
     shell:
         """
-        samtools view -q 0 -b -F 0x400 -F 0x100 -F 0x800 {input.bam} | \
+        samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} | \
         bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         """
@@ -96,7 +99,7 @@ rule call_cnvs_and_ptrs:
     input:
         fasta = get_reference,
         bigwig = rules.bamcoverage.output.bigwig,
-        ori = rules.summarize_genomes.output.oris,
+        #ori = rules.summarize_genomes.output.oris,
     output:
         cnv_info = cnv_outprefix + '.ploidy.bgmtx.gz',
         cnv_calls = cnv_outprefix + '.ploidy.bedgraph.gz',
@@ -129,18 +132,6 @@ rule call_cnvs_and_ptrs:
 
 
 
-#######################################
-#######################################
-#######################################
-#######################################
-#######################################
-ploidy = 2
-#######################################
-#######################################
-#######################################
-#######################################
-
-
 rule aggregate_ploidy_changes:
     input:
         cnv_calls = expand(rules.call_cnvs_and_ptrs.output.cnv_deviations,
@@ -148,14 +139,15 @@ rule aggregate_ploidy_changes:
     output:
         temp('processing/variants/cnv_calls.bed')
     params:
-        ploidy = ploidy
+        ploidy = config['base_ploidy']
     shell:
         "cat {input.cnv_calls} | "
         "awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' "
         "> {output}"
 
-#wildcard_constraints:
-#    region='[a-zA-Z0-9]+:[0-9]+-[0-9]+',
+
+wildcard_constraints:
+    region='[a-zA-Z0-9._-]+:[0-9]+-[0-9]+'
 
 rule callvariants:
     input:
@@ -173,11 +165,7 @@ rule callvariants:
     benchmark:
         'benchmark/freebayes/{region}.tsv'
     params:
-        ploidy = ploidy, # We can assume that each *sample* is haploid at non-CNV loci, since there will probably be a genotypically dominant strain
-                    # and most alleles will have AF=1. A pooled sample, however, will have potentially `n_samples`*1 haplotypes.
-                    # Since CNV loci will appear to have greater allelic diversity due to duplicated/paralogous sequence mapping, 
-                    # the CNV map will help determine the ploidy to model at those loci.
-                    #lambda w : max( int(sqrt( len(list_input_samples(w, rules.markduplicates.output[0])) )), 1 ),
+        ploidy = config['base_ploidy'],
     conda:
         'envs/freebayes.yaml'
     shell:
@@ -194,66 +182,8 @@ rule callvariants:
             --haplotype-length 3 \
             --allele-balance-priors-off \
             --report-genotype-likelihood-max \
+            --theta 0.01 \
             {input.samples} > {output.vcf}
-        """
-
-
-checkpoint chunk_genome:
-    input:
-        rules.summarize_genomes.output.chromsizes,
-    output:
-        temp('genomes/windows.bed')
-    conda:
-        "envs/bedtools.yaml"
-    params:
-        window_size = 1000000
-    shell:
-        'bedtools makewindows -g {input} -w {params.window_size} > {output}'
-
-        
-def get_chunked_variant_calls(wildcards):
-
-    regions_file = checkpoints.chunk_genome.get(**wildcards).output[0]
-
-    with open(regions_file) as f:
-        regions = [
-            '{}:{}-{}'.format(*map(str, line.strip().split('\t')[:3])) 
-            for line in f
-        ]
-
-    return expand(
-        rules.callvariants.output.vcf, region = regions
-    ) 
-
-
-def fdr_to_qual(fdr):
-    return int(-10 * log10(fdr))
-
-
-rule merge_vcfs:
-    input:
-        vcfs = get_chunked_variant_calls,
-        reference = get_reference
-    output:
-        vcf = temp('analysis/all/vcf.filtered.bcf')
-    conda:
-        'envs/bcftools.yaml'
-    params:
-        min_reads = 3,
-        qual = fdr_to_qual(0.01),
-    conda:
-        "envs/bcftools.yaml"
-    log:
-        "logs/merge_vcfs.log"
-    resources:
-        mem_mb = double_on_failure(config['resources']['merge_vcfs']['mem_mb']),
-        runtime = double_on_failure_time(config['resources']['merge_vcfs']['runtime'])
-    threads: config['resources']['merge_vcfs']['threads']
-    shell:
-        """
-        bcftools concat {input.vcfs} | \
-        bcftools norm -D -f {input.reference} | \
-        bcftools filter -i 'FMT/DP>={params.min_reads} && QUAL>={params.qual}' -Ov > {output.vcf} 2> {log}
         """
 
 
@@ -283,17 +213,17 @@ rule make_snpEff_db:
 
 rule annotate_vcf:
     input:
-        vcf = rules.merge_vcfs.output,
+        vcf = rules.callvariants.output,
         snpEff_database = rules.make_snpEff_db.output,
         snpEff_config = rules.make_snpEff_db.output.config,
     output:
-        protected('analysis/all/variants.annotated.bcf')
+        temp('processing/annotation/{region}.vcf')
     conda:
         "envs/snpEff.yaml"
     log:
-        'logs/annotate_vcf.log'
+        'logs/annotate/{region}.log'
     benchmark:
-        'benchmark/annotate_vcf.tsv'
+        'benchmark/annotate/{region}.tsv'
     resources:
         mem_mb = double_on_failure(config['resources']['annotate_vcf']['mem_mb']),
         runtime = double_on_failure_time(config['resources']['annotate_vcf']['runtime'])
@@ -301,13 +231,70 @@ rule annotate_vcf:
     params:
         config = 'analysis/snpEff/snpEff.config',
     shell:
-        "snpEff -c {input.snpEff_config} IBD {input.vcf} | " \
-        "bcftools view -Oz > {output} && bcftools index {output}"
+        "awk '$4 !~ /N/' {input.vcf} | snpEff -c {input.snpEff_config} IBD > {output}"
+
+
+checkpoint chunk_genome:
+    input:
+        get_chromsizes,
+    output:
+        temp('genomes/windows.bed')
+    conda:
+        "envs/bedtools.yaml"
+    params:
+        window_size = int( config['variant_calling_window_size'] * 100000 )
+    shell:
+        'bedtools makewindows -g {input} -w {params.window_size} > {output}'
+
+
+def get_chunked_variant_calls(wildcards):
+
+    regions_file = checkpoints.chunk_genome.get(**wildcards).output[0]
+
+    with open(regions_file) as f:
+        regions = [
+            '{}:{}-{}'.format(*map(str, line.strip().split('\t')[:3])) 
+            for line in f
+        ]
+
+    return expand(
+        rules.annotate_vcf.output, region = regions
+    ) 
+
+
+def fdr_to_qual(fdr):
+    return int(-10 * log10(fdr))
+
+rule merge_vcfs:
+    input:
+        vcfs = get_chunked_variant_calls,
+        reference = get_reference
+    output:
+        vcf = protected('analysis/all/variants.bcf')
+    conda:
+        'envs/bcftools.yaml'
+    params:
+        min_reads = config['min_supporting_reads'],
+        qual = fdr_to_qual(config['variant_fdr']),
+    conda:
+        "envs/bcftools.yaml"
+    log:
+        "logs/merge_vcfs.log"
+    resources:
+        mem_mb = double_on_failure(config['resources']['merge_vcfs']['mem_mb']),
+        runtime = double_on_failure_time(config['resources']['merge_vcfs']['runtime'])
+    threads: config['resources']['merge_vcfs']['threads']
+    shell:
+        """
+        bcftools concat {input.vcfs} | \
+        bcftools norm -d none -f {input.reference} | \
+        bcftools filter -i 'QUAL>={params.qual}' -Ov > {output.vcf} 2> {log}
+        """
 
 
 rule get_sample_vcf:
     input:
-        rules.annotate_vcf.output
+        rules.merge_vcfs.output
     output:
         temp('analysis/samples/{sample}/vcf.bcf')
     conda:
@@ -316,19 +303,3 @@ rule get_sample_vcf:
         "bcftools view {input} -c1 -Oz -s {wildcards.sample} > {output} && bcftools index {output}"
 
 
-'''
-rule get_snp_counts:
-    input:
-        rules.get_sample_vcf.output
-    output:
-        protected('analysis/samples/{sample}/allele_counts.tsv.gz')
-    conda:
-        "envs/bcftools.yaml"
-    shell:
-        """
-        bcftools view calls.norm.vcf --exclude 'TYPE!="snp"' | \
-        bcftools norm -m+any -a | bcftools query -f '%CHROM\t %POS\t %REF\t %ALT\t%INFO/AF\t %INFO/DP\n' | \
-        python scripts/get_readsupport.py | bgzip -c > {output} && \
-        tabix -s1 -b2 -e2 {output}
-        """
-'''

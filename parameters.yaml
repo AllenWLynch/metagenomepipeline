@@ -1,0 +1,13 @@
+
+# alignment
+adapters : path/to/adapters.yml
+
+# abundance and CNVs
+min_count_quality : 20
+
+
+# variant calling
+base_ploidy : 4
+min_supporting_reads : 3
+variant_fdr : 0.01
+variant_calling_window_size : 10 # in MB

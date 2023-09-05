@@ -40,6 +40,9 @@ def get_gff(wildcards):
 def get_contigs(wildcards):
     return rules.merge_annotations.output.contigs
 
+def get_chromsizes(wildcards):
+    return 'genomes/all/genomic.chromsizes'
+
 
 include: "alignment.smk"
 include: "postprocessing.smk"
@@ -49,21 +52,24 @@ include: "analysis.smk"
 if config['_run_pipeline'] == 'build-ref':
 
     targets = [
-        *rules.summarize_genomes.output,
+        *expand(rules.summarize_genome.output.chromsizes, genome = genomes_list + ['all']),\
+        *rules.merge_annotations.output,
         rules.make_index.output,
         rules.make_snpEff_db.output,
     ]
 
 elif config['_run_pipeline'] == 'align':
 
-    targets = list(expand(rules.markduplicates.output, sample = samples_list))
- 
+    targets = [
+        *expand(rules.markduplicates.output, sample = samples_list),
+        *expand(rules.get_multimap_stats.output.stats, sample = samples_list)
+    ]
+
 elif config['_run_pipeline'] == 'variants':
     
     targets = [
-        rules.annotate_vcf.output,
+        rules.merge_vcfs.output,
         *expand(rules.summarize_abundances.output, sample = samples_list),
-        *expand(rules.get_multimap_stats.output.stats, sample = samples_list)
     ]
 
 
