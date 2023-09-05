@@ -1,8 +1,20 @@
 
 import re
 
-genomes_list = [metadata['reference'] for species, metadata in config['genomes'].items()]
-samples_list = list(config['samples'].keys())
+# Define conveniance methods for accessing the fasta and gff files for downstream analysis.
+# This allows you to provide your own reference or gff instead of automatically downloading from NCBI. 
+def get_reference(wildcards):
+    return rules.merge_annotations.output.fasta
+
+def get_gff(wildcards):
+    return rules.merge_annotations.output.gff
+
+def get_contigs(wildcards):
+    return 'genomes/all/contigs.tsv'
+
+def get_chromsizes(wildcards):
+    return 'genomes/all/genomic.chromsizes'
+
 
 def double_on_failure(base_resources):
     def _double_on_failure(wildcards, attempt):
@@ -24,29 +36,20 @@ def double_on_failure_time(base_time):
     
     return _double_on_failure_time
 
-### DELETE THIS !!! ##
-# config['groups'] = {group_id : samples for group_id, samples in config['groups'].items() if len(samples) == 1}
-###
+try:
+    genomes_list = [metadata['reference'] for species, metadata in config['genomes'].items()]
+    samples_list = list(config['samples'].keys())
+except KeyError:
+    genomes_list = []
+    samples_list = []
+
 
 include: "genomes.smk"
-# Define conveniance methods for accessing the fasta and gff files for downstream analysis.
-# This allows you to provide your own reference or gff instead of automatically downloading from NCBI. 
-def get_reference(wildcards):
-    return rules.merge_annotations.output.fasta
 
-def get_gff(wildcards):
-    return rules.merge_annotations.output.gff
-
-def get_contigs(wildcards):
-    return rules.merge_annotations.output.contigs
-
-def get_chromsizes(wildcards):
-    return 'genomes/all/genomic.chromsizes'
-
-
-include: "alignment.smk"
-include: "postprocessing.smk"
-include: "analysis.smk"
+if config['_run_pipeline'] in ['build-ref','variants','align']:    
+    include: "alignment.smk"
+    include: "postprocessing.smk"
+    include: "analysis.smk"
 
 
 if config['_run_pipeline'] == 'build-ref':
@@ -56,6 +59,12 @@ if config['_run_pipeline'] == 'build-ref':
         *rules.merge_annotations.output,
         rules.make_index.output,
         rules.make_snpEff_db.output,
+    ]
+
+elif config['_run_pipeline'] == 'download-genome':
+
+    targets = [
+        expand(rules.summarize_genome.output.chromsizes, genome = config['_download_genomes']),
     ]
 
 elif config['_run_pipeline'] == 'align':
@@ -73,7 +82,6 @@ elif config['_run_pipeline'] == 'variants':
     ]
 
 
-# set the union of sample and group-level files as the target for the pipeline.
 rule all:
     input: targets
         

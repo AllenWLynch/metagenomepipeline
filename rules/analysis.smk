@@ -238,7 +238,7 @@ checkpoint chunk_genome:
     input:
         get_chromsizes,
     output:
-        temp('genomes/windows.bed')
+        temp('genomes/all/windows.bed')
     conda:
         "envs/bedtools.yaml"
     params:

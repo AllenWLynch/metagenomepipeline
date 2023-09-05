@@ -1,8 +1,20 @@
 
 
-# Construct the bowtie index for alignment.
-#
+# This rule merges all the GFF annotations into a single file
+# for alignment indexing.
+rule merge_annotations:
+    input:
+        fastas = expand(rules.move_genome.output.fasta, genome = genomes_list),
+        gff = expand(rules.move_genome.output.gff, genome = genomes_list),
+    output:
+        fasta = 'genomes/all/genomic.fa',
+        gff = 'genomes/all/genomic.gff',
+    shell:
+        "cat {input.fastas} > {output.fasta} && " \
+        "cat {input.gff} | grep -v '#' | sort -k1,1 -k5,5n > {output.gff}"
 
+
+# Construct the bowtie index for alignment.
 index_prefix = 'processing/index/bowtie2_index' 
 rule make_index:
     input:
@@ -24,6 +36,7 @@ rule make_index:
         index_prefix = index_prefix
     shell:
         'mkdir -p processing/index && bowtie2-build {input} {params.index_prefix} > {log} 2>&1'
+
 
 rule test:
     output:
@@ -52,7 +65,7 @@ rule trim_reads_paired:
     benchmark:
         'benchmark/trim/{sample}.tsv'
     params:
-        adapters = config['adapter_fa']
+        adapters = config['adapters_fa']
     shell:
         """
         trimmomatic \
@@ -78,7 +91,7 @@ rule trim_reads_unpaired:
     message:
         'Trimming reads for SE sample {wildcards.sample}'
     params:
-        adapters = config['adapter_fa']
+        adapters = config['adapters_fa']
     shell:
         """
         trimmomatic \

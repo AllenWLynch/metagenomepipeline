@@ -1,6 +1,6 @@
 
 wildcard_constraints:
-    genome = '|'.join(genomes_list + ['all'])
+    genome = '[a-zA-Z0-9._-]+|all'
 
 
 # Fetch the genome from the same NCBI endpoint.
@@ -64,20 +64,6 @@ rule summarize_genome:
         paste {output.contigs}.tmp1 {output.contigs}.tmp2 >> {output.contigs} && \
         rm {output.contigs}.tmp1 {output.contigs}.tmp2
         '''
-
-
-# This rule merges all the GFF annotations into a single file
-# for alignment indexing.
-rule merge_annotations:
-    input:
-        fastas = expand(rules.move_genome.output.fasta, genome = genomes_list),
-        gff = expand(rules.move_genome.output.gff, genome = genomes_list),
-    output:
-        fasta = 'genomes/all/genomic.fa',
-        gff = 'genomes/all/genomic.gff',
-    shell:
-        "cat {input.fastas} > {output.fasta} && " \
-        "cat {input.gff} | grep -v '#' | sort -k1,1 -k5,5n > {output.gff} && " \
 
 
 #gc_skew_bedgraph = 'genomes/gc_skew.bedgraph.gz',

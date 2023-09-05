@@ -1,6 +1,6 @@
 
 # alignment
-adapters : path/to/adapters.yml
+adapters_fa : path/to/adapters.yml
 
 # abundance and CNVs
 min_count_quality : 20
