@@ -13,7 +13,7 @@ rule download_genome:
         url = lambda wildcards : download_url.format(genome = wildcards.genome)
     group: 'download'
     shell:
-        'curl -OJX GET {params.url} -H "Accept: application/zip"'
+        'curl -OJX GET {params.url} --fail -H "Accept: application/zip"'
 
 
 # The NCBI endpoint returns a zip file with a nasty directory scheme.
@@ -47,7 +47,7 @@ rule summarize_genome:
         dict = 'genomes/{genome}/genomic.dict',
         contigs = 'genomes/{genome}/contigs.tsv'
     conda:
-        "envs/bedtools.yaml"
+        "envs/samtools.yaml"
     group: "download"
     params:
         header = '#' + '\t#'.join('genome, contig, genus, species, source, strain, type'.split(', '))

@@ -6,12 +6,28 @@ rule merge_annotations:
     input:
         fastas = expand(rules.move_genome.output.fasta, genome = genomes_list),
         gff = expand(rules.move_genome.output.gff, genome = genomes_list),
+        contigs = expand(rules.summarize_genome.output.contigs, genome = genomes_list),
     output:
         fasta = 'genomes/all/genomic.fa',
         gff = 'genomes/all/genomic.gff',
+        index = 'genomes/all/genomic.fa.fai',
+        chromsizes = 'genomes/all/genomic.chromsizes',
+        dict = 'genomes/all/genomic.dict',
+        contigs = 'genomes/all/contigs.tsv'
+    conda:
+        "envs/samtools.yaml"
     shell:
-        "cat {input.fastas} > {output.fasta} && " \
-        "cat {input.gff} | grep -v '#' | sort -k1,1 -k5,5n > {output.gff}"
+        """
+        cat {input.fastas} > {output.fasta} && \
+        cat {input.gff} | grep -v '#' | sort -k1,1 -k5,5n > {output.gff} && \
+        \
+        samtools faidx {output.fasta} && \
+        cut -f1,2 {output.fasta}.fai > {output.chromsizes} && \
+        samtools dict {output.fasta} -o {output.dict} && \
+        \
+        head -n1 {input.contigs[0]} > {output.contigs}
+        cat {input.contigs} | grep -v '^#genome' >> {output.contigs}
+        """
 
 
 # Construct the bowtie index for alignment.

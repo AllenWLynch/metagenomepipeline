@@ -5,7 +5,6 @@ adapters_fa : path/to/adapters.yml
 # abundance and CNVs
 min_count_quality : 20
 
-
 # variant calling
 base_ploidy : 4
 min_supporting_reads : 3
