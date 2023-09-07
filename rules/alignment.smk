@@ -122,7 +122,7 @@ rule align_pe:
         reads = rules.trim_reads_paired.output,
         index = rules.make_index.output
     output:
-        sam = 'processing/align/{sample}-pe.sam',
+        sam = temp('processing/align/{sample}-pe.sam'),
         stats = 'QC/samples/{sample}/flagstat.txt'
     conda:
         'envs/bowtie2.yaml'

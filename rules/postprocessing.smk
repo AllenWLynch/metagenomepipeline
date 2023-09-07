@@ -23,11 +23,10 @@ rule sort:
 
 rule markduplicates:
     input:
-        rules.sort.output,
+        bams = rules.sort.output,
     output:
-        protected('analysis/samples/{sample}/{sample}.bam'),
-    conda:
-        'envs/picard.yaml'
+        bam = protected('analysis/samples/{sample}/{sample}.bam'),
+        metrics = "QC/samples/{sample}/duplicates.txt"
     resources:
         mem_mb = double_on_failure(config['resources']['markduplicates']['mem_mb']),
         runtime = double_on_failure_time(config['resources']['markduplicates']['runtime'])
@@ -36,14 +35,10 @@ rule markduplicates:
         'logs/markdups/{sample}.log'
     benchmark:
         'benchmark/markdups/{sample}.tsv'
-    shell:
-        """
-        picard MarkDuplicates \
-            I={input} \
-            O={output} \
-            M={log} > {log} 2>&1 && \
-        samtools index {output}
-        """
+    params:
+        extra="--CREATE_INDEX true"
+    wrapper:
+        "v2.6.0/bio/picard/markduplicates"
 
 rule bam_index:
     input:
@@ -58,7 +53,7 @@ rule bam_index:
 
 rule get_multimap_stats:
     input:
-        bam = rules.markduplicates.output,
+        bam = rules.markduplicates.output.bam,
         contigs = get_contigs,
     output:
         stats = 'analysis/samples/{sample}/multimap_stats.tsv',
