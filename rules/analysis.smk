@@ -68,7 +68,7 @@ rule summarize_abundances:
 ##
 rule bamcoverage:
     input:
-        bam = rules.markduplicates.output,
+        bam = rules.filter_bamfile.output,
         bamindex = rules.bam_index.output,
         chromsizes = get_chromsizes,
     output:
@@ -88,8 +88,7 @@ rule bamcoverage:
         quality = config['min_count_quality']
     shell:
         """
-        samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} | \
-        bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
+        bedtools genomecov -ibam - -bga < {input.bam} | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         """
 

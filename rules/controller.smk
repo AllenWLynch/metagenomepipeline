@@ -15,6 +15,9 @@ def get_contigs(wildcards):
 def get_chromsizes(wildcards):
     return 'genomes/all/genomic.chromsizes'
 
+def get_bam(wildcards):
+    return rules.markduplicates.output.bam
+
 
 def double_on_failure(base_resources):
     def _double_on_failure(wildcards, attempt):

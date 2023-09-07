@@ -64,4 +64,14 @@ rule get_multimap_stats:
         scripts = config['_external_scripts']
     shell:
         "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
-        
+
+
+rule filter_bamfile:
+    input:
+        bam = get_bam,
+    output:
+        pipe( "analysis/samples/{sample}.filtered.bam" ) 
+    params:
+        quality = config['min_count_quality']
+    shell:
+        "samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} -h > {output}"
