@@ -1,6 +1,6 @@
 
 # alignment
-adapters_fa : path/to/adapters.yml
+adapters_fa : /broad/smillie-data/db/adapters/adapters.mgx.fa
 
 # abundance and CNVs
 min_count_quality : 20
