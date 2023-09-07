@@ -117,12 +117,28 @@ rule trim_reads_unpaired:
         """
 
 
+def get_reads_paired(wildcards):
+    if 'is_trimmed' in config['samples'][wildcards.sample] and \
+        config['samples'][wildcards.sample]['is_trimmed']:
+
+        return [
+            config['samples'][wildcards.sample]['read1'],
+            config['samples'][wildcards.sample]['read2']
+        ]
+
+    else:
+        return [
+            rules.trim_reads_paired.output.r1,
+            rules.trim_reads_paired.output.r2
+        ]
+
+
 rule align_pe:
     input:
         reads = rules.trim_reads_paired.output,
         index = rules.make_index.output
     output:
-        sam = 'processing/align/{sample}-pe.sam',
+        sam = temp('processing/align/{sample}-pe.sam'),
         stats = 'QC/samples/{sample}/flagstat.txt'
     conda:
         'envs/bowtie2.yaml'
