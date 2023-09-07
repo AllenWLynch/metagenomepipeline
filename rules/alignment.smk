@@ -117,6 +117,7 @@ rule trim_reads_unpaired:
         """
 
 
+
 def get_reads_paired(wildcards):
     if 'is_trimmed' in config['samples'][wildcards.sample] and \
         config['samples'][wildcards.sample]['is_trimmed']:
@@ -125,7 +126,6 @@ def get_reads_paired(wildcards):
             config['samples'][wildcards.sample]['read1'],
             config['samples'][wildcards.sample]['read2']
         ]
-
     else:
         return [
             rules.trim_reads_paired.output.r1,
@@ -135,7 +135,7 @@ def get_reads_paired(wildcards):
 
 rule align_pe:
     input:
-        reads = rules.trim_reads_paired.output,
+        reads = get_reads_paired,
         index = rules.make_index.output
     output:
         sam = temp('processing/align/{sample}-pe.sam'),
@@ -163,12 +163,24 @@ rule align_pe:
         """
 
 
+def get_reads_se(wildcards):
+    
+    if 'is_trimmed' in config['samples'][wildcards.sample] and \
+        config['samples'][wildcards.sample]['is_trimmed']:
+
+        return config['samples'][wildcards.sample]['read1'],
+
+    else:
+        return rules.trim_reads_unpaired.output.r1
+
+
 rule align_se:
     input:
         reads = rules.trim_reads_unpaired.output,
         index = rules.make_index.output,
     output:
-        temp('processing/align/{sample}-se.sam')
+        sam = temp('processing/align/{sample}-se.sam'),
+        stats = 'QC/samples/{sample}/flagstat.txt'
     conda:
         'envs/bowtie2.yaml'
     resources:
@@ -186,6 +198,6 @@ rule align_se:
         bowtie2 -x {params.index} \
             -U {input.reads} \
             --threads {threads} \
-            --very-sensitive -a --no-unal -S {output} \
-            && sleep 10 && du -sh {output} > {log}
+            --very-sensitive -a --no-unal -S {output} > {log} 2>&1 \
+        && samtools flagstat {output.sam} > {output.stats}
         """
