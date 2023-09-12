@@ -8,7 +8,7 @@ rule feature_counts:
     input:
        bam = rules.markduplicates.output,
        bamindex = rules.bam_index.output,
-       gff = rules.move_genome.output.gff,
+       gff = rules.unpack_genome.output.gff,
     output:
         'analysis/samples/{sample}/feature_counts/{genome}.tsv'
     resources:

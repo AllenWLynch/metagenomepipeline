@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Check if the required arguments are provided
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <genome_ID> <GFF_file_name>"
+    exit 1
+fi
+
+# Parse the command-line arguments
+genome_id="$1"
+gff_file_name="$2"
+
+# Base URL
+base_url="http://ftp.ebi.ac.uk/pub/databases/metagenomics/mgnify_genomes/human-gut/v1.0/all_genomes/${genome_id%??}/$genome_id/"
+
+echo $base_url
+
+#exit 1
+
+# Iterate through "genomes" directories from 1 to 10
+for i in {1..10}; do
+    # Construct the URL for the current "genomes" directory
+    current_dir="genomes$i"
+    url="$base_url$current_dir/$gff_file_name"
+    
+    # Attempt to download the file using curl
+    curl -O -L --fail "$url" 2> /dev/null
+    
+    # Check if the download was successful
+    if [ $? -eq 0 ]; then
+        echo "Downloaded $gff_file_name from $current_dir directory."
+        exit 0  # Exit if successful
+    fi
+done
+
+# If the loop completes without finding the file
+echo "File $gff_file_name not found in any 'genomes' directory."
+exit 1

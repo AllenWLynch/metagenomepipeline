@@ -40,7 +40,7 @@ def double_on_failure_time(base_time):
     return _double_on_failure_time
 
 try:
-    genomes_list = [metadata['reference'] for species, metadata in config['genomes'].items()]
+    genomes_list = list(config['genomes'].keys())
     samples_list = list(config['samples'].keys())
 except KeyError:
     genomes_list = []
