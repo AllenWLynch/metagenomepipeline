@@ -39,7 +39,7 @@ TMPFILE=$(mktemp)
 # for each read's aligned contig.
 join -1 2 -2 1  \
     <(samtools view $sam_out | cut -f1,3 | sort -k2,2) \
-    <(awk -v OFS="\t" '{print $2,$3"-"$4}' $contigs | grep -v "#" | sort -k1,1) \
+    <(awk -v OFS="\t" '{print $2,$3}' $contigs | grep -v "#" | sort -k1,1) \
     > $TMPFILE
 
 
