@@ -18,12 +18,15 @@ def add_snake_arg(command, key, value):
     return command
 
 
-def get_main_args(args):
+def get_snakemake_command(args):
 
     snakepath = os.path.dirname(os.path.abspath(__file__))
 
     snakefile = os.path.join(snakepath, 'rules', 'controller.smk')
     profile = os.path.join(snakepath, 'default_configs')
+    resources_config = os.path.join(snakepath, 'resources.yaml')
+    scripts_path = os.path.join(snakepath, 'scripts')
+
 
     command = [
         'snakemake',
@@ -49,23 +52,16 @@ def get_main_args(args):
     if not args.snake_args is None:
         command.extend( args.snake_args )
 
-    return command, snakepath
-
-
-
-def config_pipeline(args, command, snakepath):
-
-    resources_config = os.path.join(snakepath, 'resources.yaml')
-
     command.extend([
         '--configfiles', args.samples_config, args.genomes_config, args.parameters_config, resources_config,
     ])
 
-    return command, {}
+    # add configuration arguments to the command string
+    command.append('--config')
+    add_snake_arg(command, '_external_scripts', scripts_path)
+    add_snake_arg(command, '_run_pipeline', args.run)
 
-
-def config_download_genomes(args, command, snakepath):
-    return command, {'_download_genomes' : ' '.join(args.genome)}
+    return command
 
 
 def get_parser():
@@ -99,44 +95,24 @@ def get_parser():
     
     # each subcommand has a "setup" function that adds subcommand-specific arguments to the command string
     # and a pipeline name ("run") which tells snakemake which files to target
-    buildref_subparser.set_defaults(run = 'build-ref', setup = config_pipeline)
+    buildref_subparser.set_defaults(run = 'build-ref')
 
     align_subparser = subparser.add_parser('align', help = 'Align reads to reference genome')
     add_pipeline_args(align_subparser)
     add_common_args(align_subparser)
-    align_subparser.set_defaults(run = 'align', setup = config_pipeline)
+    align_subparser.set_defaults(run = 'align')
 
     variants_subparser = subparser.add_parser('variants', help = 'Call variants from aligned reads')
     add_pipeline_args(variants_subparser)
     add_common_args(variants_subparser)
-    variants_subparser.set_defaults(run = 'variants', setup = config_pipeline)
-
-    '''download_subparser = subparser.add_parser('download-genome', help = 'Download genome from NCBI')
-    download_subparser.add_argument('genome', nargs='+', help = 'Genome to download', type = str)
-    add_common_args(download_subparser)
-    download_subparser.set_defaults(run = 'download-genome', setup = config_download_genomes)'''
+    variants_subparser.set_defaults(run = 'variants')
     
     return parser
 
 
 def main(args):
 
-    #1. build main command string based on snakefile location and cluster options
-    command, snakepath = get_main_args(args)
-
-    #2. add subcommand-specific arguments to the command string
-    #   and collect configurations
-    command, configs = args.setup(args,command, snakepath)
-    
-    scripts_path = os.path.join(snakepath, 'scripts')
-
-    #3. add configuration arguments to the command string
-    command.append('--config')
-    add_snake_arg(command, '_external_scripts', scripts_path)
-    add_snake_arg(command, '_run_pipeline', args.run)
-
-    for k, v in configs.items():
-        add_snake_arg(command, k, v)
+    command = get_snakemake_command(args)
     
     print("""
       _________       .__.__  .__  .__      __________.__              .__  .__               

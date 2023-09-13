@@ -12,7 +12,7 @@ def convert_yaml_to_df(args):
 
     data = yaml.load(args.yaml_file, Loader=yaml.FullLoader)
 
-    if not args.subsection is None:
+    if not args.subsection.upper() == 'NONE':
         data = data[args.subsection]
 
     flat = nested_to_record(
@@ -37,6 +37,10 @@ def convert_df_to_yaml(args):
 
     records = read_csv(args.input, sep = '\t').to_dict(orient = 'records')
 
+    if len(records) == 0:
+        print('No records found in input file. Did you forget to pass the header line?', file = sys.stderr)
+        sys.exit(1)
+
     def move_keys_to_nested_dicts(data_list):
         for data_dict in data_list:
             new_dict = {}
@@ -57,7 +61,7 @@ def convert_df_to_yaml(args):
         for record in records
     }
 
-    if not args.subsection is None:
+    if not args.subsection.upper() == 'NONE':
         records = {args.subsection : records}
 
     print( yaml.dump(records, default_flow_style=False) , file = sys.stdout)
@@ -73,8 +77,9 @@ def get_parser():
     yaml_convert.add_argument('yaml_file', 
                               type = argparse.FileType('r'), 
                               help='Yaml file to convert')
-    yaml_convert.add_argument('--subsection', '-s',type = str, default='samples',
-                              help = 'Subsection of yaml file to convert')
+    yaml_convert.add_argument('--subsection', '-s',type = str, required=True,
+                              help = 'Subsection of yaml file to convert. A yaml file may have multiple main sections, e.g. samples, genomes, parameters. \n'
+                                     'If you pass "NONE" as the subsection, the yaml file will be converted to a flat dictionary.')
     
     yaml_convert.set_defaults(func=convert_yaml_to_df)
 
@@ -84,8 +89,8 @@ def get_parser():
     df_convert.add_argument('input', 
                               type = argparse.FileType('r'), 
                               help='Yaml file to convert')
-    df_convert.add_argument('--subsection', '-s',type = str, default='samples',
-                              help = 'Subsection of yaml file to convert')
+    df_convert.add_argument('--subsection', '-s',type = str, required=True,
+                              help = 'Write dictionary under subsection name in the YAML file. If "NONE" is passed, the dictionary will be written at the top level.')
     df_convert.add_argument('--delim','-d', type = str, default = '\t')
     df_convert.set_defaults(func=convert_df_to_yaml)
     

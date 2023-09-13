@@ -6,9 +6,9 @@ from math import sqrt, log10
 ##
 rule feature_counts:
     input:
-       bam = rules.markduplicates.output,
-       bamindex = rules.bam_index.output,
-       gff = 'genomes/{genome}/genomic.gff',
+       bam = get_bam,
+       bamindex = get_bai,
+       gff = get_gff,
     output:
         'analysis/samples/{sample}/feature_counts/{genome}.tsv'
     resources:
@@ -66,7 +66,6 @@ rule summarize_abundances:
 rule bamcoverage:
     input:
         bam = rules.filter_bamfile.output,
-        bamindex = rules.bam_index.output,
         chromsizes = get_chromsizes,
     output:
         bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),

@@ -10,13 +10,16 @@ def get_gff(wildcards):
     return rules.merge_annotations.output.gff
 
 def get_contigs(wildcards):
-    return 'genomes/all/contigs.tsv'
+    return rules.merge_annotations.output.contigs
 
 def get_chromsizes(wildcards):
-    return 'genomes/all/genomic.chromsizes'
+    return rules.merge_annotations.output.chromsizes
 
 def get_bam(wildcards):
     return rules.markduplicates.output.bam
+
+def get_bai(wildcards):
+    return rules.bam_index.output
 
 
 def double_on_failure(base_resources):
@@ -39,21 +42,15 @@ def double_on_failure_time(base_time):
     
     return _double_on_failure_time
 
-try:
-    genomes_list = list(config['genomes'].keys())
-    samples_list = list(config['samples'].keys())
-except KeyError:
-    genomes_list = []
-    samples_list = []
+
+genomes_list = list(config['genomes'].keys())
+samples_list = list(config['samples'].keys())
 
 
 include: "genomes.smk"
-
-if config['_run_pipeline'] in ['build-ref','variants','align']:    
-    include: "alignment.smk"
-    include: "postprocessing.smk"
-    include: "analysis.smk"
-    
+include: "alignment.smk"
+include: "postprocessing.smk"
+include: "analysis.smk"    
 
 if config['_run_pipeline'] == 'build-ref':
 
@@ -62,12 +59,6 @@ if config['_run_pipeline'] == 'build-ref':
         *rules.merge_annotations.output,
         rules.make_index.output,
         rules.make_snpEff_db.output,
-    ]
-
-elif config['_run_pipeline'] == 'download-genome':
-
-    targets = [
-        expand(rules.summarize_genome.output.chromsizes, genome = config['_download_genomes']),
     ]
 
 elif config['_run_pipeline'] == 'align':
