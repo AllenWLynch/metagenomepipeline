@@ -62,7 +62,6 @@ rule summarize_abundances:
         ).fillna(0.).to_csv(output[0], sep = '\t')
 
 
-
 rule bamcoverage:
     input:
         bam = rules.filter_bamfile.output,
@@ -152,7 +151,6 @@ rule callvariants:
     input:
         samples = expand(rules.markduplicates.output, sample = samples_list),
         reference = get_reference,
-        cnv_calls = rules.aggregate_ploidy_changes.output,
     output:
         vcf = temp('processing/variants/{region}.vcf'),
     resources:
@@ -172,7 +170,6 @@ rule callvariants:
         freebayes -f {input.reference} \
             --region {wildcards.region} \
             --ploidy {params.ploidy} \
-            --cnv-map {input.cnv_calls} \
             --pooled-discrete \
             --pooled-continuous \
             --use-best-n-alleles 6 \

@@ -68,12 +68,17 @@ elif config['_run_pipeline'] == 'align':
         *expand(rules.get_multimap_stats.output.stats, sample = samples_list)
     ]
 
-elif config['_run_pipeline'] == 'variants':
+elif config['_run_pipeline'] == 'count':
 
-    
+    targets = [
+        *expand(rules.summarize_abundances.output, sample = samples_list),
+        *expand(rules.bamcoverage.output.bigwig, sample = samples_list),
+    ]
+
+elif confit['_run_pipeline'] == 'variants':
+
     targets = [
         rules.merge_vcfs.output,
-        *expand(rules.summarize_abundances.output, sample = samples_list),
     ]
 
 

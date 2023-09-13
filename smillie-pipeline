@@ -92,15 +92,17 @@ def get_parser():
     buildref_subparser = subparser.add_parser('build-ref', help = 'Download genomes and create indexes for various tools.')
     add_pipeline_args(buildref_subparser)
     add_common_args(buildref_subparser)
-    
-    # each subcommand has a "setup" function that adds subcommand-specific arguments to the command string
-    # and a pipeline name ("run") which tells snakemake which files to target
     buildref_subparser.set_defaults(run = 'build-ref')
 
     align_subparser = subparser.add_parser('align', help = 'Align reads to reference genome')
     add_pipeline_args(align_subparser)
     add_common_args(align_subparser)
     align_subparser.set_defaults(run = 'align')
+
+    count_subparser = subparser.add_parser('count', help = 'Count gene and genome coverages.')
+    add_pipeline_args(count_subparser)
+    add_common_args(count_subparser)
+    count_subparser.set_defaults(run = 'count')
 
     variants_subparser = subparser.add_parser('variants', help = 'Call variants from aligned reads')
     add_pipeline_args(variants_subparser)
