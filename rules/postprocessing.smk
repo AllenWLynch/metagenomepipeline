@@ -40,9 +40,10 @@ rule markduplicates:
     wrapper:
         "v2.6.0/bio/picard/markduplicates"
 
+
 rule bam_index:
     input:
-        rules.markduplicates.output
+        rules.markduplicates.output.bam
     output:
         'analysis/samples/{sample}/{sample}.bam.bai'
     conda:
