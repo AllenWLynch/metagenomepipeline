@@ -8,7 +8,7 @@ rule feature_counts:
     input:
        bam = rules.markduplicates.output,
        bamindex = rules.bam_index.output,
-       gff = rules.unpack_genome.output.gff,
+       gff = 'genomes/{genome}/genomic.gff',
     output:
         'analysis/samples/{sample}/feature_counts/{genome}.tsv'
     resources:
@@ -28,8 +28,8 @@ rule feature_counts:
         "{sample}_counting"
     shell:
         """
-        python {params.scripts}/query-gff -i {input.gff} -type gene -attr gene -gff > {input.gff}.tmp && \
-        featureCounts -a {input.gff}.tmp -o {output} -t gene -g gene \
+        python {params.scripts}/query-gff -i {input.gff} -type CDS -attr gene -gff > {input.gff}.tmp && \
+        featureCounts -a {input.gff}.tmp -o {output} -t CDS -g gene \
             -Q {params.quality} --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1 &&
         rm {input.gff}.tmp
         """
@@ -62,10 +62,7 @@ rule summarize_abundances:
         ).fillna(0.).to_csv(output[0], sep = '\t')
 
 
-## Section 2 - CNV calling
-# Using information from the origin of replication and coverage,
-# Call CNVs and PTRs for each sample
-##
+
 rule bamcoverage:
     input:
         bam = rules.filter_bamfile.output,
@@ -93,6 +90,10 @@ rule bamcoverage:
         """
 
 
+## Section 2 - CNV calling
+# Using information from the origin of replication and coverage,
+# Call CNVs and PTRs for each sample
+##
 cnv_outprefix = 'analysis/samples/{sample}/MetaCNV'
 rule call_cnvs_and_ptrs:
     input:

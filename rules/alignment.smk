@@ -4,9 +4,9 @@
 # for alignment indexing.
 rule merge_annotations:
     input:
-        fastas = expand(rules.unpack_genome.output.fasta, genome = genomes_list),
-        gff = expand(rules.unpack_genome.output.gff, genome = genomes_list),
-        contigs = expand(rules.make_contigs_file.output, genome = genomes_list),
+        fastas = expand('genomes/{genome}/genomic.fa', genome = genomes_list),
+        gff = expand('genomes/{genome}/genomic.gff', genome = genomes_list),
+        contigs = expand('genomes/{genome}/contigs.tsv', genome = genomes_list),
     output:
         fasta = 'genomes/all/genomic.fa',
         gff = 'genomes/all/genomic.gff',

@@ -52,8 +52,6 @@ include: "genomes.smk"
 if config['_run_pipeline'] in ['build-ref','variants','align']:    
     include: "alignment.smk"
     include: "postprocessing.smk"
-    include: "analysis.smk"
-
 
 if config['_run_pipeline'] == 'build-ref':
 
@@ -78,6 +76,8 @@ elif config['_run_pipeline'] == 'align':
     ]
 
 elif config['_run_pipeline'] == 'variants':
+
+    include: "analysis.smk"
     
     targets = [
         rules.merge_vcfs.output,

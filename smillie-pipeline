@@ -58,7 +58,7 @@ def config_pipeline(args, command, snakepath):
     resources_config = os.path.join(snakepath, 'resources.yaml')
 
     command.extend([
-        '--configfiles', args.samples_config, args.sequences_config, args.parameters_config, resources_config,
+        '--configfiles', args.samples_config, args.genomes_config, args.parameters_config, resources_config,
     ])
 
     return command, {}
@@ -87,7 +87,7 @@ def get_parser():
         argument_group = parser.add_argument_group('Pipeline arguments')
         argument_group.add_argument('--samples-config', '-samples', type = check_file_exists, required=True,
                         help = 'Specifies the samples and groups of samples to process')
-        argument_group.add_argument('--sequences-config','-sequences', type = check_file_exists, required=True,
+        argument_group.add_argument('--genomes-config','-genomes', type = check_file_exists, required=True,
                                 help = 'Configuration file for sequences and annotations')
         argument_group.add_argument('--parameters-config', '-parameters', type = check_file_exists, required=True,
                                 help = 'Configuration file for parameters')
@@ -111,10 +111,10 @@ def get_parser():
     add_common_args(variants_subparser)
     variants_subparser.set_defaults(run = 'variants', setup = config_pipeline)
 
-    download_subparser = subparser.add_parser('download-genome', help = 'Download genome from NCBI')
+    '''download_subparser = subparser.add_parser('download-genome', help = 'Download genome from NCBI')
     download_subparser.add_argument('genome', nargs='+', help = 'Genome to download', type = str)
     add_common_args(download_subparser)
-    download_subparser.set_defaults(run = 'download-genome', setup = config_download_genomes)
+    download_subparser.set_defaults(run = 'download-genome', setup = config_download_genomes)'''
     
     return parser
 
