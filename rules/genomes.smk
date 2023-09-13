@@ -62,7 +62,7 @@ rule make_contigs_file:
         'download'
     params:
         header = '#' + '\t#'.join('genome, contig, species'.split(', ')),
-        species = lambda wildcards : config['genomes'][wildcards.genome]['species'],
+        species = lambda wildcards : config['genomes'][wildcards.genome]['species'].replace(' ','-'),
     shell:
         'echo -e "{params.header}" > {output} && ' 
         'grep ">" {input} | cut -c2- | cut -f1 -d" " | awk -v OFS="\t" \'{{print "{wildcards.genome}", $0, "{params.species}"}}\' >> {output}'
