@@ -149,7 +149,7 @@ wildcard_constraints:
 
 rule callvariants:
     input:
-        samples = expand(rules.markduplicates.output, sample = samples_list),
+        samples = expand(rules.markduplicates.output.bam, sample = samples_list),
         reference = get_reference,
     output:
         vcf = temp('processing/variants/{region}.vcf'),

@@ -75,7 +75,7 @@ elif config['_run_pipeline'] == 'count':
         *expand(rules.bamcoverage.output.bigwig, sample = samples_list),
     ]
 
-elif confit['_run_pipeline'] == 'variants':
+elif config['_run_pipeline'] == 'variants':
 
     targets = [
         rules.merge_vcfs.output,
