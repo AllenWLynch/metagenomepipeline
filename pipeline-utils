@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+import argparse
+import yaml
+import sys
+from pandas.io.json._normalize import nested_to_record
+from pandas import DataFrame, read_csv
+import warnings
+
+
+def convert_yaml_to_df(args):
+
+    data = yaml.load(args.yaml_file, Loader=yaml.FullLoader)
+
+    if not args.subsection is None:
+        data = data[args.subsection]
+
+    flat = nested_to_record(
+        [{'ID' : key, **metadata} for key, metadata in data.items()], 
+        sep='.'
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        
+        try:
+            DataFrame(flat).to_csv(
+                sys.stdout, 
+                sep='\t', 
+                index=False,
+            )
+        except (IOError, BrokenPipeError) as e:
+            pass
+
+
+def convert_df_to_yaml(args):
+
+    records = read_csv(args.input, sep = '\t').to_dict(orient = 'records')
+
+    def move_keys_to_nested_dicts(data_list):
+        for data_dict in data_list:
+            new_dict = {}
+            for key, value in data_dict.items():
+                parts = key.split('.')
+                current_dict = new_dict
+                for part in parts[:-1]:
+                    current_dict = current_dict.setdefault(part, {})
+                current_dict[parts[-1]] = value
+            data_dict.clear()
+            data_dict.update(new_dict)
+
+    move_keys_to_nested_dicts(records)
+
+    #unset the ID field
+    records = {
+        record['ID'] : { k:v for k,v in record.items() if not k == 'ID'}
+        for record in records
+    }
+
+    if not args.subsection is None:
+        records = {args.subsection : records}
+
+    print( yaml.dump(records, default_flow_style=False) , file = sys.stdout)
+
+
+
+def get_parser():
+    parser = argparse.ArgumentParser()
+    subparser = parser.add_subparsers(dest = 'command')
+
+
+    yaml_convert = subparser.add_parser('to-df', help = 'Convert section of yaml file to TSV file.')
+    yaml_convert.add_argument('yaml_file', 
+                              type = argparse.FileType('r'), 
+                              help='Yaml file to convert')
+    yaml_convert.add_argument('--subsection', '-s',type = str, default='samples',
+                              help = 'Subsection of yaml file to convert')
+    
+    yaml_convert.set_defaults(func=convert_yaml_to_df)
+
+
+
+    df_convert = subparser.add_parser('to-yaml', help = 'Convert TSV file to yaml configuration file.')
+    df_convert.add_argument('input', 
+                              type = argparse.FileType('r'), 
+                              help='Yaml file to convert')
+    df_convert.add_argument('--subsection', '-s',type = str, default='samples',
+                              help = 'Subsection of yaml file to convert')
+    df_convert.add_argument('--delim','-d', type = str, default = '\t')
+    df_convert.set_defaults(func=convert_df_to_yaml)
+    
+    return parser
+
+
+def main():
+    args = get_parser().parse_args()
+
+    try:
+        args.func
+    except AttributeError:
+        print(get_parser().format_help(), file = sys.stderr)
+        sys.exit(1)
+    
+    args.func(args)
+
+
+if __name__ == '__main__':
+    main()
