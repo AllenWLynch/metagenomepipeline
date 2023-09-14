@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <bam> <region>"
+    exit 1
+fi
+
+bam="$1"
+region="$2"
+
+samtools consensus \
+    --region $region \
+    --line-len 10000000000000 \
+    -f fasta \
+    --mode simple \
+    -aa --show-ins no \
+    --use-qual \
+    --min-MQ 20 \
+    --min-depth 10 \
+    --ambig \
+    --het-frac 0.8 \
+    --call-frac 0.5 $bam | \
+    tail -n+2 | awk -v OFS="\t" -v region=$region -v sample=$(basename "$bam" ".bam") '{print region,sample,$0}'

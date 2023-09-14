@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ "$#" -lt 4 ]; then
+    echo "Usage: $0 <bam> <fasta> <window-size> <window-size> <min-depth>"
+    exit 1
+fi
+
+bam="$1"
+fasta="$2"
+window_size="$3"
+min_depth="$4"
+script_dir="$(dirname "$0")"
+
+
+bedtools makewindows -w $window_size -g <(cut -f1,2 ${fasta}.fai) | \
+    bedtools map -sorted -a - -b <(
+        samtools mpileup --reference $fasta --no-BAQ $bam | \
+            awk -v min_depth="$min_depth" '$4>=min_depth' | \
+            python $script_dir/pileup-entropy.py - --model major-minor 
+    ) -c 5 -null '-1.' -o mean,count

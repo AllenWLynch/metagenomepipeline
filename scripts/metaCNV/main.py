@@ -122,7 +122,7 @@ def get_parser():
     parser.add_argument('--bigwig','-bw', type = str, required = True)
     parser.add_argument('--ori','-ori', type = str, required = True)
     parser.add_argument('--outprefix','-o', type = str, required = True)
-    parser.add_argument('--window_size','-ws', type = int, default = 100)
+    parser.add_argument('--window-size','-ws', type = int, default = 100)
     
     return parser
 

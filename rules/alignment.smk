@@ -176,7 +176,7 @@ def get_reads_se(wildcards):
 
 rule align_se:
     input:
-        reads = rules.trim_reads_unpaired.output,
+        reads = get_reads_se,
         index = rules.make_index.output,
     output:
         sam = temp('processing/align/{sample}-se.sam'),

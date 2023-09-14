@@ -26,7 +26,7 @@ def convert_yaml_to_df(args):
         try:
             DataFrame(flat).to_csv(
                 sys.stdout, 
-                sep='\t', 
+                sep=args.delim, 
                 index=False,
             )
         except (IOError, BrokenPipeError) as e:
@@ -35,7 +35,7 @@ def convert_yaml_to_df(args):
 
 def convert_df_to_yaml(args):
 
-    records = read_csv(args.input, sep = '\t').to_dict(orient = 'records')
+    records = read_csv(args.input, sep = args.delim).to_dict(orient = 'records')
 
     if len(records) == 0:
         print('No records found in input file. Did you forget to pass the header line?', file = sys.stderr)
@@ -56,10 +56,13 @@ def convert_df_to_yaml(args):
     move_keys_to_nested_dicts(records)
 
     #unset the ID field
-    records = {
-        record['ID'] : { k:v for k,v in record.items() if not k == 'ID'}
-        for record in records
-    }
+    try:
+        records = {
+            record['ID'] : { k:v for k,v in record.items() if not k == 'ID'}
+            for record in records
+        }
+    except KeyError:
+        'No "ID" field found in the header line, did you give the right delimiter?'
 
     if not args.subsection.upper() == 'NONE':
         records = {args.subsection : records}
@@ -80,6 +83,7 @@ def get_parser():
     yaml_convert.add_argument('--subsection', '-s',type = str, required=True,
                               help = 'Subsection of yaml file to convert. A yaml file may have multiple main sections, e.g. samples, genomes, parameters. \n'
                                      'If you pass "NONE" as the subsection, the yaml file will be converted to a flat dictionary.')
+    yaml_convert.add_argument('--delim','-d', type = str, default = '\t')
     
     yaml_convert.set_defaults(func=convert_yaml_to_df)
 

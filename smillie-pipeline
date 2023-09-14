@@ -5,6 +5,12 @@ import os
 import argparse
 import sys
 
+snakepath = os.path.dirname(os.path.abspath(__file__))
+snakefile = os.path.join(snakepath, 'rules', 'controller.smk')
+profile = os.path.join(snakepath, 'default_configs')
+resources_config = os.path.join(snakepath, 'resources.yaml')
+scripts_path = os.path.join(snakepath, 'scripts')
+
 
 def check_file_exists(filename):
     if not os.path.isfile(filename):
@@ -19,14 +25,6 @@ def add_snake_arg(command, key, value):
 
 
 def get_snakemake_command(args):
-
-    snakepath = os.path.dirname(os.path.abspath(__file__))
-
-    snakefile = os.path.join(snakepath, 'rules', 'controller.smk')
-    profile = os.path.join(snakepath, 'default_configs')
-    resources_config = os.path.join(snakepath, 'resources.yaml')
-    scripts_path = os.path.join(snakepath, 'scripts')
-
 
     command = [
         'snakemake',
@@ -85,7 +83,8 @@ def get_parser():
                         help = 'Specifies the samples and groups of samples to process')
         argument_group.add_argument('--genomes-config','-genomes', type = check_file_exists, required=True,
                                 help = 'Configuration file for sequences and annotations')
-        argument_group.add_argument('--parameters-config', '-parameters', type = check_file_exists, required=True,
+        argument_group.add_argument('--parameters-config', '-parameters', type = check_file_exists, 
+                                default = os.path.join(snakepath, 'parameters.yaml'),
                                 help = 'Configuration file for parameters')
     
 

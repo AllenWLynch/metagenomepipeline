@@ -50,22 +50,34 @@ def get_coverage_from_bigwig(
 
 
 def get_gc_content_per_window(*,
-    fasta_file, 
-    outfile,
+    fasta_file,
     window_size = 250,
 ):  
     
-    index_file = fasta_file + '.fai'
-    if not os.path.isfile(index_file):
-        pyfaidx.index(fasta_file)
+    with tempfile.NamedTemporaryFile() as windows_file:
+    
+        index_file = fasta_file + '.fai'
+        if not os.path.isfile(index_file):
+            pyfaidx.index(fasta_file)
 
-    gc_command = f"cut -f1,2 {index_file} | bedtools makewindows -g - -w {int(window_size)} | " \
-                    f"bedtools nuc -bed - -fi {fasta_file} | cut -f1,2,3,5 | tail -n+2 > {outfile}"
+        outfile = windows_file.name
 
-    subprocess.run(
-        gc_command, 
-        shell = True, check = True
-    )
+        gc_command = f"cut -f1,2 {index_file} | bedtools makewindows -g - -w {int(window_size)} | " \
+                        f"bedtools nuc -bed - -fi {fasta_file} | cut -f1,2,3,5 | tail -n+2 > {outfile}"
+
+        subprocess.run(
+            gc_command, 
+            shell = True, check = True
+        )
+
+        regions = pd.read_csv(
+                outfile, 
+                sep = '\t', 
+                names = ['chr', 'start', 'end', 'gc'], 
+                header = None
+            )
+        
+    return regions
 
 
 
@@ -78,27 +90,17 @@ def get_dataframe(*,
     min_average_coverage = 5,
 ):
     
-    with tempfile.NamedTemporaryFile() as windows_file:
-
-        # 1. create windows and get GC content within each window
-        get_gc_content_per_window(
-                fasta_file = fasta_file,
-                outfile = windows_file.name,
-                window_size=window_size
-            )
-        
-        regions = pd.read_csv(
-                    windows_file.name, 
-                    sep = '\t', 
-                    names = ['chr', 'start', 'end', 'gc'], 
-                    header = None
-                )
-        
-        # 2. get coverage from bigwig file
-        regions['coverage'] = get_coverage_from_bigwig(
-            bigwig_path = bigwig_file,
-            region_gc = regions,
-        )  
+    # 1. create windows and get GC content within each window
+    regions = get_gc_content_per_window(
+            fasta_file = fasta_file,
+            window_size=window_size
+        )
+    
+    # 2. get coverage from bigwig file
+    regions['coverage'] = get_coverage_from_bigwig(
+        bigwig_path = bigwig_file,
+        region_gc = regions,
+    )  
 
     # 3. read contig sizes
     chrom_sizes = pd.read_csv(fasta_file + '.fai', 
