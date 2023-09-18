@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ "$#" -lt 4 ]; then
-    echo "Usage: $0 <bam> <fasta> <window-size> <window-size> <min-depth>"
+    echo "Usage: $0 <bam> <fasta> <window-size> <min-depth>"
     exit 1
 fi
 
@@ -11,10 +11,13 @@ window_size="$3"
 min_depth="$4"
 script_dir="$(dirname "$0")"
 
-
 bedtools makewindows -w $window_size -g <(cut -f1,2 ${fasta}.fai) | \
     bedtools map -sorted -a - -b <(
-        samtools mpileup --reference $fasta --no-BAQ $bam | \
+        samtools view -q 20 -b -F 0x400 -F 0x100 -F 0x800 $bam -h | \
+            samtools mpileup --reference $fasta --no-BAQ - | \
             awk -v min_depth="$min_depth" '$4>=min_depth' | \
             python $script_dir/pileup-entropy.py - --model major-minor 
-    ) -c 5 -null '-1.' -o mean,count
+    ) -c 5 -null '-1.' -o mean,count | \
+    awk -v OFS="\t" -v w=$window_size '$5>=w/2'
+
+#tabix -s 1 -b 2 -e 3 empirical-entropy.bedgraph.gz

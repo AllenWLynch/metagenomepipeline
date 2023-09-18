@@ -64,7 +64,7 @@ rule summarize_abundances:
 
 rule bamcoverage:
     input:
-        bam = rules.filter_bamfile.output,
+        bam = get_bam,
         chromsizes = get_chromsizes,
     output:
         bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
@@ -83,7 +83,8 @@ rule bamcoverage:
         quality = config['min_count_quality']
     shell:
         """
-        bedtools genomecov -ibam - -bga < {input.bam} | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
+        samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} -h | \
+        bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         """
 
@@ -92,12 +93,35 @@ rule bamcoverage:
 # Using information from the origin of replication and coverage,
 # Call CNVs and PTRs for each sample
 ##
+
+
+rule find_oris:
+    input:
+        fasta = get_reference,
+        chromsizes = get_chromsizes,
+    output:
+        temp('genomes/all/oris.bed')
+    threads: 1
+    conda:
+        'envs/bedtools.yaml'
+    log:
+        'logs/find_oris/{sample}.log'
+    benchmark:
+        'benchmark/find_oris/{sample}.tsv'
+    params:
+        scripts = config['_external_scripts']
+    shell:
+        """
+        bash {params.scripts}/ORIFinder {input.fasta} {input.chromsizes} > {output}
+        """
+
+
 cnv_outprefix = 'analysis/samples/{sample}/MetaCNV'
 rule call_cnvs_and_ptrs:
     input:
         fasta = get_reference,
         bigwig = rules.bamcoverage.output.bigwig,
-        #ori = rules.summarize_genomes.output.oris,
+        ori = rules.find_oris.output,
     output:
         cnv_info = cnv_outprefix + '.ploidy.bgmtx.gz',
         cnv_calls = cnv_outprefix + '.ploidy.bedgraph.gz',

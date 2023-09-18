@@ -17,7 +17,5 @@ samtools consensus \
     --use-qual \
     --min-MQ 20 \
     --min-depth 10 \
-    --ambig \
-    --het-frac 0.8 \
-    --call-frac 0.5 $bam | \
+    --call-frac 0.6 $bam | \
     tail -n+2 | awk -v OFS="\t" -v region=$region -v sample=$(basename "$bam" ".bam") '{print region,sample,$0}'

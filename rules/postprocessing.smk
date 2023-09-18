@@ -18,7 +18,7 @@ rule sort:
     benchmark:
         'benchmark/sort/{sample}.tsv'
     shell:
-        "samtools view -h {input} | samtools sort -O bam -@ {threads} > {output} 2> {log}"
+        "samtools view -h {input} | samtools sort -O bam -@ {threads} -T $TMPDIR > {output} 2> {log}"
 
 
 rule markduplicates:
@@ -66,13 +66,3 @@ rule get_multimap_stats:
     shell:
         "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
 
-
-rule filter_bamfile:
-    input:
-        bam = get_bam,
-    output:
-        pipe( "analysis/samples/{sample}.filtered.bam" ) 
-    params:
-        quality = config['min_count_quality']
-    shell:
-        "samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} -h > {output}"
