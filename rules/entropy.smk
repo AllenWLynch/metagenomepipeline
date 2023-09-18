@@ -52,6 +52,8 @@ rule get_alleles:
     input:
         consensuses = expand(rules.get_consensus.output, samples = samples_list),
         chromsizes = get_chromsizes,
+    output:
+        'analysis/entropy/alleles.tsv'
     params:
         scripts = config['_external_scripts'],
         window_size = 200,
