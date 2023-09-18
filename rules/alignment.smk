@@ -171,7 +171,7 @@ def get_reads_se(wildcards):
         return config['samples'][wildcards.sample]['read1'],
 
     else:
-        return rules.trim_reads_unpaired.output.r1
+        return rules.trim_reads_unpaired.output
 
 
 rule align_se:

@@ -4,13 +4,27 @@ from math import sqrt, log10
 #  Count the number of mapped reads falling on each "gene" feature in the gff
 #  Save genes x counts for each genome in a separate file
 ##
+
+rule get_CDS_features:
+    input:
+        'genomes/{genome}/genomic.gff'
+    output:
+        temp('genomes/{genome}/cds.gff')
+    log:
+        'logs/{genome}/CDS_features.log'
+    params:
+        scripts = config['_external_scripts']
+    shell:
+        'python {params.scripts}/query-gff -i {input} -type CDS -attr gene -gff > {output}'
+
+
 rule feature_counts:
     input:
        bam = get_bam,
        bamindex = get_bai,
-       gff = get_gff,
+       gff = rules.get_CDS_features.output,
     output:
-        'analysis/samples/{sample}/feature_counts/{genome}.tsv'
+        temp('analysis/samples/{sample}/feature_counts/{genome}.tsv')
     resources:
         mem_mb = double_on_failure(config['resources']['htseq_count']['mem_mb']),
         runtime = double_on_failure_time(config['resources']['htseq_count']['runtime'])
@@ -22,21 +36,17 @@ rule feature_counts:
     benchmark:
         'benchmark/feature_count/{sample}_{genome}.tsv'
     params:
-        scripts = config['_external_scripts'],
         quality = config['min_count_quality']
     group:
         "{sample}_counting"
     shell:
         """
-        python {params.scripts}/query-gff -i {input.gff} -type CDS -attr gene -gff > {input.gff}.tmp && \
-        featureCounts -a {input.gff}.tmp -o {output} -t CDS -g gene \
-            -Q {params.quality} --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1 &&
-        rm {input.gff}.tmp
+        featureCounts -a {input.gff} -o {output} -t CDS -g gene \
+            -Q {params.quality} --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1
         """
 
 # Aggregate the counts for each genome into a single file 
 # which describes relative abundances for each species in the sample
-#
 rule summarize_abundances:
     input:
         gene_counts = lambda w :expand(rules.feature_counts.output, genome = genomes_list, sample = w.sample)
