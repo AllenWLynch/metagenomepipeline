@@ -31,7 +31,7 @@ rule get_entropy:
         'analysis/samples/{sample}/entropy.bed'
     log:
         'logs/entropy/{sample}.log'
-     benchmark:
+    benchmark:
         'benchmark/entropy/{sample}.tsv'
     params:
         scripts = config['_external_scripts'],
@@ -50,7 +50,7 @@ rule get_entropy:
 
 rule get_alleles:
     input:
-        consensuses = expand(rules.get_consensus.output, samples = samples_list),
+        consensuses = expand(rules.get_consensus.output, sample = samples_list),
         chromsizes = get_chromsizes,
     output:
         'analysis/entropy/alleles.tsv'

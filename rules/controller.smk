@@ -51,6 +51,7 @@ include: "genomes.smk"
 include: "alignment.smk"
 include: "postprocessing.smk"
 include: "analysis.smk"    
+include: "entropy.smk"
 
 if config['_run_pipeline'] == 'build-ref':
 
@@ -65,7 +66,7 @@ elif config['_run_pipeline'] == 'align':
 
     targets = [
         *expand(rules.markduplicates.output, sample = samples_list),
-        *expand(rules.bam_index.output, sample = samples_list)
+        *expand(rules.bam_index.output, sample = samples_list),
         *expand(rules.get_multimap_stats.output.stats, sample = samples_list)
     ]
 
