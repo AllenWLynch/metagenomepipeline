@@ -105,9 +105,9 @@ rule find_oris:
     conda:
         'envs/bedtools.yaml'
     log:
-        'logs/find_oris/{sample}.log'
+        'logs/find_oris.log'
     benchmark:
-        'benchmark/find_oris/{sample}.tsv'
+        'benchmark/find_oris.tsv'
     params:
         scripts = config['_external_scripts']
     shell:

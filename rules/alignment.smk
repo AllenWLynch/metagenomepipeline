@@ -196,8 +196,10 @@ rule align_se:
     shell:
         """
         bowtie2 -x {params.index} \
+            --rg-id {wildcards.sample} --rg SM:{wildcards.sample} \
             -U {input.reads} \
             --threads {threads} \
             --very-sensitive -a --no-unal -S {output} > {log} 2>&1 \
-        && samtools flagstat {output.sam} > {output.stats}
+        && samtools flagstat {output.sam} > {output.stats} &&
+        echo "HERE" > {log}
         """
