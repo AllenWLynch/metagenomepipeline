@@ -36,13 +36,14 @@ rule feature_counts:
     benchmark:
         'benchmark/feature_count/{sample}_{genome}.tsv'
     params:
-        quality = config['min_count_quality']
+        quality = config['min_count_quality'],
+        paired_param = lambda wildcards : '-p' if config['samples'][wildcards.sample]['is_paired'] else '',
     group:
         "{sample}_counting"
     shell:
         """
         featureCounts -a {input.gff} -o {output} -t CDS -g gene \
-            -Q {params.quality} --primary --ignoreDup -p {input.bam} --extraAttributes ID > {log} 2>&1
+            -Q {params.quality} --primary --ignoreDup {params.paired_param} {input.bam} --extraAttributes ID > {log} 2>&1
         """
 
 # Aggregate the counts for each genome into a single file 
@@ -103,8 +104,6 @@ rule bamcoverage:
 # Using information from the origin of replication and coverage,
 # Call CNVs and PTRs for each sample
 ##
-
-
 rule find_oris:
     input:
         fasta = get_reference,

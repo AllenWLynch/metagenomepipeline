@@ -35,8 +35,6 @@ rule markduplicates:
         'logs/markdups/{sample}.log'
     benchmark:
         'benchmark/markdups/{sample}.tsv'
-    params:
-        extra="--CREATE_INDEX true"
     wrapper:
         "v2.6.0/bio/picard/markduplicates"
 
