@@ -63,22 +63,22 @@ rule get_alleles:
         scripts = config['_external_scripts'],
         window_size = 200,
     conda: "envs/bedtools.yaml"
+    threads : 16
     shell:
         '''
         mkdir -p analysis/entropy;
         echo -e "region\ttheta_mle\tn_alleles\tn_samples\tconsensus_allele\tn_variants_distribution" > {output};
         regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2+1"-"$3}}');
-        #numregions=${{#regions[@]}}
-        #echo $numregions
-        N=8
-        for region in $regions; do
-            #(
+
+        get_alleles (){
+            region=$1;
+            
             for cons in {input.consensuses}; do samtools faidx -n0 $cons $region | grep -v "^>"; done | \
                 python {params.scripts}/allele-stats.py - | \
-                awk -v region=$region -v OFS="\t" '{{print region,$0}}' \
-                >> {output} 
-            #) & 
-        done
-        wait;
+                awk -v region=$region -v OFS="\t" '{{print region,$0}}';
+        }
+
+        export -f get_alleles;
+        echo -e $regions | xargs -d" " -n1 -P{threads} -I% bash -c "get_alleles %" >> {output};
         '''
 
