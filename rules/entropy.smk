@@ -19,7 +19,8 @@ rule get_consensus:
             --min-MQ 20 \
             --min-depth 5 \
             --call-frac 0.6 \
-            {input.bam} > {output} 2> {output}.log
+            {input.bam} > {output} 2> {log} && \
+        samtools faidx {output}
         '''
 
 
@@ -57,15 +58,23 @@ rule get_alleles:
     params:
         scripts = config['_external_scripts'],
         window_size = 200,
+    conda: "envs/bedtools.yaml"
     shell:
         '''
+        mkdir -p analysis/entropy;
         echo -e "region\ttheta_mle\tn_alleles\tn_samples\tconsensus_allele\tn_variants_distribution" > {output};
-        regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2"-"$3}}');
+        regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2+1"-"$3}}');
+        #numregions=${{#regions[@]}}
+        #echo $numregions
+        N=8
         for region in $regions; do
-            echo {input.consensuses} | xargs -I % samtools faidx % $region | grep -v "^>" | \
-                {params.scripts}/allele-stats.py | \
+            #(
+            for cons in {input.consensuses}; do samtools faidx -n0 $cons $region | grep -v "^>"; done | \
+                python {params.scripts}/allele-stats.py - | \
                 awk -v region=$region -v OFS="\t" '{{print region,$0}}' \
-                >> {output};
+                >> {output} 
+            #) & 
         done
+        wait;
         '''
 
