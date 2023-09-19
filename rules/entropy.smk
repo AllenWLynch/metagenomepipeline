@@ -67,14 +67,6 @@ rule get_alleles:
         '''
         mkdir -p analysis/entropy;
         echo -e "region\ttheta_mle\tn_alleles\tn_samples\tconsensus_allele\tn_variants_distribution" > {output};
-<<<<<<< HEAD
-        regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2 + 1"-"$3}}');
-        for region in $regions; do
-            for consensus in {input.consensuses}; do samtools faidx $consensus $region | grep -v "^>"; done | \
-            python {params.scripts}/allele-stats.py | \
-            awk -v region=$region -v OFS="\t" '{{print region,$0}}' \
-            >> {output};
-=======
         regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2+1"-"$3}}');
         #numregions=${{#regions[@]}}
         #echo $numregions
@@ -86,7 +78,6 @@ rule get_alleles:
                 awk -v region=$region -v OFS="\t" '{{print region,$0}}' \
                 >> {output} 
             #) & 
->>>>>>> b8b339c014fd3b2b29c4f548dc154c313bd8dba6
         done
         wait;
         '''
