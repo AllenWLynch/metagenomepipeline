@@ -19,12 +19,8 @@ rule get_consensus:
             --min-MQ 20 \
             --min-depth 5 \
             --call-frac 0.6 \
-<<<<<<< HEAD
-            {input.bam} > {output} 2> {log}
-=======
             {input.bam} > {output} 2> {log} && \
         samtools faidx {output}
->>>>>>> b8b339c014fd3b2b29c4f548dc154c313bd8dba6
         '''
 
 
@@ -40,7 +36,7 @@ rule get_entropy:
         'benchmark/entropy/{sample}.tsv'
     params:
         scripts = config['_external_scripts'],
-        window_size = 200,
+        window_size = config['cnv_window_size'],
         min_depth = 5,
     conda:
         "envs/samtools.yaml"
@@ -56,29 +52,64 @@ rule get_entropy:
 rule get_alleles:
     input:
         consensuses = expand(rules.get_consensus.output, sample = samples_list),
-        chromsizes = get_chromsizes,
     output:
-        'analysis/entropy/alleles.tsv'
+        'analysis/entropy/regions/{region}.txt'
     params:
         scripts = config['_external_scripts'],
-        window_size = 200,
     conda: "envs/bedtools.yaml"
-    threads : 16
+    group: 'alleles'
+    params:
+        window_size = int( config['cnv_window_size'] )
     shell:
-        '''
-        mkdir -p analysis/entropy;
-        echo -e "region\ttheta_mle\tn_alleles\tn_samples\tconsensus_allele\tn_variants_distribution" > {output};
-        regions=$(bedtools makewindows -g {input.chromsizes} -w {params.window_size} | awk '{{print $1":"$2+1"-"$3}}');
-
-        get_alleles (){
-            region=$1;
-            
+        """
+        region_to_bed=$( echo "{wildcards.region}" | awk -F"[:-]" '{{ print $1\"\\t\"$2+1\"\\t\"$3 }}' );
+        regions=$(bedtools makewindows -b <( echo $region_to_bed ) -w {params.window_size} | awk '{{ print $1":"$2"-"$3 }}');
+        \
+        for region in regions; do
             for cons in {input.consensuses}; do samtools faidx -n0 $cons $region | grep -v "^>"; done | \
                 python {params.scripts}/allele-stats.py - | \
-                awk -v region=$region -v OFS="\t" '{{print region,$0}}';
-        }
+                awk -v region=$region -v OFS="\t" '{{print region,$0}}' > {output}
+        done
+        """
+        
 
-        export -f get_alleles;
-        echo -e $regions | xargs -d" " -n1 -P{threads} -I% bash -c "get_alleles %" >> {output};
-        '''
+checkpoint entropy_chunk_genome:
+    input:
+        get_chromsizes,
+    output:
+        temp('analysis/entropy/windows.bed')
+    conda:
+        "envs/bedtools.yaml"
+    params:
+        window_size = int( config['cnv_window_size']*1000 )
+    shell:
+        'bedtools makewindows -g {input} -w {params.window_size} > {output}'
+
+
+def get_chunked_theta_estimates(wildcards):
+
+    regions_file = checkpoints.entropy_chunk_genome.get(**wildcards).output[0]
+
+    regions = []
+    with open(regions_file) as f:
+        for line in f:
+            chrom,start,end = line.strip().split('\t')
+            regions.append(
+                f'{chrom}:{start}-{end}'
+            )
+
+    return expand(
+        rules.get_alleles.output, region = regions
+    )
+
+
+rule aggregate_thetas:
+    input:
+        get_chunked_theta_estimates,
+    output:
+        'analysis/entropy/theta_estimates.tsv'
+    shell:
+        'cat {input} > {output}'
+
+
 

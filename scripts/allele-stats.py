@@ -16,6 +16,8 @@ def alleles_equal(a1, a2):
 
     return True
 
+class NoSamplesError(ValueError):
+    pass
 
 def get_num_alleles(sample_alleles):
 
@@ -35,7 +37,10 @@ def get_num_alleles(sample_alleles):
                         break
                 else:
                     allele_list.append(sample_allele)
-
+    
+    if n_samples <= 1:
+        raise NoSamplesError('No samples with non-N alleles')
+    
     return len(allele_list)/log(n_samples), allele_list, n_samples
 
 
@@ -63,13 +68,19 @@ def get_num_variants_distribution(unique_alleles, consensus_allele):
 
 def main(allele_list, output):
 
-    theta_hat, alleles, n_samples = get_num_alleles(
-                map(lambda x : x.strip(), allele_list.readlines())
-            )
+    try:
+        
+        theta_hat, alleles, n_samples = get_num_alleles(
+                    map(lambda x : x.strip(), allele_list.readlines())
+                )
+        
+        consensus_allele = get_consensus(alleles)
+        diffcounts = get_num_variants_distribution(alleles, consensus_allele)
 
-    consensus_allele = get_consensus(alleles)
-
-    diffcounts = get_num_variants_distribution(alleles, consensus_allele)
+    except NoSamplesError:
+        theta_hat, alleles, n_samples = 0, [], 0
+        consensus_allele = 'N'*len(alleles[0])
+        diffcounts = [0]
 
     print(
         theta_hat, len(alleles), n_samples, consensus_allele, ','.join(map(str, diffcounts)),

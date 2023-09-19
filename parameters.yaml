@@ -4,6 +4,7 @@ adapters_fa : /broad/smillie-data/db/adapters/adapters.mgx.fa
 
 # abundance and CNVs
 min_count_quality : 20
+cnv_window_size : 200
 
 # variant calling
 base_ploidy : 4
