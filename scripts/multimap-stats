@@ -19,17 +19,21 @@ samtools view -H $bam_in > $sam_out
 # Sort the bam by name, then extract the reads for which there are
 # multiple mappings (duplicates on name field).
 samtools view -q 0 -F -0x800 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -h $bam_in \
-    | samtools sort -n -O sam | grep -v "^@" | awk '{
-        if ($1 in count) {
-            if (count[$1] == 1) {
-                print seen[$1];
-                count[$1]++;
-            }
+    | samtools sort -n -O sam | awk '{
+        if ($0 ~ /^@/) {
             print;
         } else {
-            seen[$1] = $0;
-            count[$1] = 1;
-        }
+            if ($1 in count) {
+                if (count[$1] == 1) {
+                    print seen[$1];
+                    count[$1]++;
+                }
+                print;
+            } else {
+                seen[$1] = $0;
+                count[$1] = 1;
+            }
+        } 
     }' >> $sam_out
 
 
