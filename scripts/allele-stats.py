@@ -7,7 +7,7 @@ from collections import Counter
 
 def alleles_equal(a1, a2):
 
-    assert len(a1) == len(a2)
+    assert len(a1) == len(a2), f'{a1}\n{a2}'
 
     for n1, n2 in zip(a1, a2):
         if not n1 == 'N' and not n2 == 'N':
@@ -20,7 +20,7 @@ class NoSamplesError(ValueError):
     pass
 
 def get_num_alleles(sample_alleles):
-
+    
     allele_list = []
     n_samples = 0
     
@@ -66,7 +66,7 @@ def get_num_variants_distribution(unique_alleles, consensus_allele):
     return diffcounts
 
 
-def main(allele_list, output):
+def main(allele_list, output, window_size):
 
     try:
         
@@ -79,7 +79,7 @@ def main(allele_list, output):
 
     except NoSamplesError:
         theta_hat, alleles, n_samples = 0, [], 0
-        consensus_allele = 'N'*len(alleles[0])
+        consensus_allele = 'N'*window_size
         diffcounts = [0]
 
     print(
@@ -93,6 +93,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('allele_list', type = argparse.FileType('r'), default = sys.stdin)
     parser.add_argument('--output', type = argparse.FileType('w'), default = sys.stdout)
+    parser.add_argument('--window-size','-w', type = int, default = 200)
     args = parser.parse_args()
 
-    main(args.allele_list, args.output)
+    main(args.allele_list, args.output, args.window_size)
