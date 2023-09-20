@@ -1,0 +1,7 @@
+name: bigwigmerge
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - conda install -c bioconda ucsc-bigwigmerge

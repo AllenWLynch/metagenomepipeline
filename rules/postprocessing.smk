@@ -64,3 +64,27 @@ rule get_multimap_stats:
     shell:
         "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
 
+
+rule pileup_multimapping:
+    input:
+        bam = rules.get_multimap_stats.output.multimap_sam,
+        chromsizes = get_chromsizes,
+    output:
+        bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
+        bigwig = 'analysis/samples/{sample}/multimap.bw',
+    shell:
+        '''
+        samtools sort -O bam {input} | bedtools genomecov -ibam - -bga | \
+            sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
+        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
+        '''
+
+
+rule aggregate_multimapping:
+    input:
+        expand( rules.pileup_multimapping.output.bigwig, sample = samples_list )
+    output:
+        'analysis/multimap.bedgraph'
+    conda: 'envs/bigwigmerge.yaml'
+    shell:
+        'bigWigMerge {input} {output}'
