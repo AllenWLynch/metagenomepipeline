@@ -4,4 +4,4 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - conda install -c bioconda ucsc-bigwigmerge
+  - ucsc-bigwigmerge
