@@ -67,14 +67,15 @@ rule get_multimap_stats:
 
 rule pileup_multimapping:
     input:
-        bam = rules.get_multimap_stats.output.multimap_sam,
+        bam = get_bam,
         chromsizes = get_chromsizes,
     output:
         bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
         bigwig = 'analysis/samples/{sample}/multimap.bw',
     shell:
         '''
-        samtools sort -O bam {input} | bedtools genomecov -ibam - -bga | \
+        samtools view -q 0 -F 0x800 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -h -f 0x100 | \
+            bedtools genomecov -ibam - -bga | \
             sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         '''
@@ -84,7 +85,20 @@ rule aggregate_multimapping:
     input:
         expand( rules.pileup_multimapping.output.bigwig, sample = samples_list )
     output:
-        'analysis/multimap.bedgraph'
+        'analysis/all/multimap-pileup.bedgraph'
     conda: 'envs/bigwigmerge.yaml'
     shell:
         'bigWigMerge {input} {output}'
+
+
+rule multimapping_coverage_stats:
+    input:
+        bedgraph = rules.aggregate_multimapping.output,
+        contigs = get_contigs,
+        chromsizes = get_chromsizes,
+    output:
+        'analysis/all/multimap-stats.tsv'
+    params:
+        scripts = config['_external_scripts']
+    shell:
+        'python scripts/summarize-multimapping.py --contigs-file {input.contigs} --chromsizes-file {input.chromsizes} -bg {input.bedgraph} > {output}'
