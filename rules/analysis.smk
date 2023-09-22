@@ -73,33 +73,6 @@ rule summarize_abundances:
         ).fillna(0.).to_csv(output[0], sep = '\t')
 
 
-rule bamcoverage:
-    input:
-        bam = get_bam,
-        chromsizes = get_chromsizes,
-    output:
-        bedgraph = temp('analysis/samples/{sample}/coverage.bedgraph'),
-        bigwig = 'analysis/samples/{sample}/coverage.bigwig'
-    resources:
-        mem_mb = double_on_failure(config['resources']['bamcoverage']['mem_mb']),
-        runtime = double_on_failure_time(config['resources']['bamcoverage']['runtime'])
-    threads: config['resources']['bamcoverage']['threads']
-    conda:
-        'envs/bedtools.yaml'
-    log:
-        'logs/coverage/{sample}.log',
-    benchmark:
-        'benchmark/coverage/{sample}.tsv'
-    params:
-        quality = config['min_count_quality']
-    shell:
-        """
-        samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} -h | \
-        bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
-        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
-        """
-
-
 ## Section 2 - CNV calling
 # Using information from the origin of replication and coverage,
 # Call CNVs and PTRs for each sample
