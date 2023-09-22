@@ -73,13 +73,14 @@ rule pileup_multimapping:
         bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
         bigwig = 'analysis/samples/{sample}/multimap.bw',
     conda: 'envs/bedtools.yaml'
+    log: 'logs/pileup_multimapping/{sample}.log'
     shell:
         '''
         samtools view -f 0x100 -h {input.sam} | \
             samtools sort | \
             bedtools genomecov -ibam - -bga | \
-            sort -k1,1 -k2,2n > {output.bedgraph} && \
-        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
+            sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} || true  && \
+        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig} 2> {log}
         '''
 
 
