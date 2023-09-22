@@ -7,7 +7,7 @@ min_count_quality : 20
 cnv_window_size : 200
 
 # variant calling
-base_ploidy : 4
+base_ploidy : 8
 min_supporting_reads : 3
 variant_fdr : 0.01
-variant_calling_window_size : 10 # in MB
+variant_calling_window_size : 2 # in MB

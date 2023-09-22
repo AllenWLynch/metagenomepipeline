@@ -67,7 +67,7 @@ rule get_multimap_stats:
 
 rule pileup_multimapping:
     input:
-        bam = get_bam,
+        sam = rules.get_multimap_stats.output.multimap_sam,
         chromsizes = get_chromsizes,
     output:
         bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
@@ -75,9 +75,9 @@ rule pileup_multimapping:
     conda: 'envs/bedtools.yaml'
     shell:
         '''
-        samtools view -q 0 -F 0x800 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -f 0x100 -h {input.bam} | \
-        awk '$0 ~ /^@/ || $7 != "="' | \
-        bedtools genomecov -ibam - -bga | \
+        samtools view -F 0x100 -h {input.sam} | \
+            samtools sort | \
+            bedtools genomecov -ibam - -bga | \
             sort -k1,1 -k2,2n > {output.bedgraph} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         '''
