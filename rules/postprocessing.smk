@@ -76,6 +76,7 @@ rule pileup_multimapping:
     shell:
         '''
         samtools view -q 0 -F 0x800 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -f 0x100 -h {input.bam} | \
+        awk '$0 ~ /^@/ || $7 != "="' | \
         bedtools genomecov -ibam - -bga | \
             sort -k1,1 -k2,2n > {output.bedgraph} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
@@ -102,4 +103,4 @@ rule multimapping_coverage_stats:
     params:
         scripts = config['_external_scripts']
     shell:
-        'python scripts/summarize-multimapping.py --contigs-file {input.contigs} --chromsizes-file {input.chromsizes} -bg {input.bedgraph} > {output}'
+        'python {params.scripts}/summarize_multimapping.py --contigs-file {input.contigs} --chromsizes-file {input.chromsizes} -bg {input.bedgraph} > {output}'
