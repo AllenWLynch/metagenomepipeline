@@ -2,6 +2,7 @@ import pandas as pd
 from collections import Counter
 import argparse
 import sys
+from math import log
 
 def main(*,contigs_file, chromsizes_file, bedgraph, outfile):
 
@@ -12,7 +13,10 @@ def main(*,contigs_file, chromsizes_file, bedgraph, outfile):
     
     contig_genome_map = dict(zip( contigs['#contig'].values, contigs['#genome'].values ))    
 
-    thresholds = [1,3,10,100,1000,10000,100000]
+    #thresholds = [1,3,10,100,1000,10000,100000]
+    # set a log-threshold for the number of secondary reads per primary read
+    thresholds = [ -t*log(10) for t in range(1,11,1) ]
+
     len_trackers = { genome : Counter() for genome in contig_genome_map.values() }
 
     for line in bedgraph:

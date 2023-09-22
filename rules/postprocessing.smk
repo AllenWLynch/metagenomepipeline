@@ -75,7 +75,7 @@ rule pileup_multimapping:
     conda: 'envs/bedtools.yaml'
     shell:
         '''
-        samtools view -F 0x100 -h {input.sam} | \
+        samtools view -f 0x100 -h {input.sam} | \
             samtools sort | \
             bedtools genomecov -ibam - -bga | \
             sort -k1,1 -k2,2n > {output.bedgraph} && \
@@ -85,17 +85,49 @@ rule pileup_multimapping:
 
 rule aggregate_multimapping:
     input:
-        expand( rules.pileup_multimapping.output.bigwig, sample = samples_list )
+        bigwigs = expand( rules.pileup_multimapping.output.bigwig, sample = samples_list ),
+        chromsizes = get_chromsizes,
     output:
-        'analysis/all/multimap-pileup.bedgraph'
+        bedgraph = temp( 'analysis/all/multimap-pileup.bedgraph' ),
+        bigwig = 'analysis/all/multimap-pileup.bw'
+    conda: 'envs/bigwigmerge.yaml'
+    params:
+        sign=''
+    shell:
+        '''
+        bigWigMerge {input.bigwigs} {output.bedgraph} && \
+        awk '{{print $0,$1,$2, {params.sign}log($3)}}' {output.bedgraph} > {output.bedgraph}.log && \
+        bedGraphToBigWig {output.bedgraph}.log {input.chromsizes} {output.bigwig} && \
+        rm {output.bedgraph}.log
+        '''
+
+use rule aggregate_multimapping as aggregate_primaries with:
+    input:
+        bigwigs = expand( rules.bamcoverage.output.bigwig, sample = samples_list ),
+        chromsizes = get_chromsizes,
+    output:
+        bedgraph = temp( 'analysis/all/primary-pileup.bedgraph' ),
+        bigwig = 'analysis/all/primary-pileup.bw'
+    params:
+        sign='-'
+
+
+rule secondary_primary_bigwig:
+    input:
+        primary = rules.aggregate_primaries.output.bigwig,
+        secondary = rules.aggregate_multimapping.output.bigwig,
+    output:
+        'analysis/all/secondary-primary-pileup.bedgraph'
     conda: 'envs/bigwigmerge.yaml'
     shell:
-        'bigWigMerge {input} {output}'
+        '''
+        bigWigMerge {input.primary} {input.secondary} {output}
+        '''
 
 
 rule multimapping_coverage_stats:
     input:
-        bedgraph = rules.aggregate_multimapping.output,
+        bedgraph = rules.secondary_primary_bigwig.output,
         contigs = get_contigs,
         chromsizes = get_chromsizes,
     output:
