@@ -18,7 +18,7 @@ fi
 # and get just the read 1's.
 # Sort the bam by name, then extract the reads for which there are
 # multiple mappings (duplicates on name field).
-samtools view -q 0 -F -0x800 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -h $bam_in \
+samtools view -q 0 -F -0x800 -F 0x400 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -h $bam_in \
     | samtools sort -n -O sam -T $TMPDIR | awk '{
         if ($0 ~ /^@/) {
             print;

@@ -68,13 +68,30 @@ rule bamcoverage:
     benchmark:
         'benchmark/coverage/{sample}.tsv'
     params:
-        quality = config['min_count_quality']
+        filter_str = '-b -q {quality} -F 0x400 -F 0x100 -F 0x800'.format(quality=config['min_count_quality'])
     shell:
         """
-        samtools view -q {params.quality} -b -F 0x400 -F 0x100 -F 0x800 {input.bam} -h | \
+        samtools view {params.filter_str} {input.bam} -h | \
         bedtools genomecov -ibam - -bga | sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} && \
         bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig}
         """
+
+
+use rule bamcoverage as pileup_multimapping with:
+    output:
+        bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
+        bigwig = temp('analysis/samples/{sample}/multimap.bw'),
+    log: 'logs/pileup_multimapping/{sample}.log'
+    params:
+        filter_str = '-b -q 0 -F -0x800 -F 0x400 -f 0x100'
+
+
+use rule bamcoverage as pileup_primaries with:
+    output:
+        bedgraph = temp('analysis/samples/{sample}/primary-coverage.bedgraph'),
+        bigwig = temp( 'analysis/samples/{sample}/primary-coverage.bigwig' ),
+    params:
+        quality = 0
 
 
 rule get_multimap_stats:
@@ -90,25 +107,6 @@ rule get_multimap_stats:
         scripts = config['_external_scripts']
     shell:
         "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
-
-
-rule pileup_multimapping:
-    input:
-        sam = rules.get_multimap_stats.output.multimap_sam,
-        chromsizes = get_chromsizes,
-    output:
-        bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
-        bigwig = 'analysis/samples/{sample}/multimap.bw',
-    conda: 'envs/bedtools.yaml'
-    log: 'logs/pileup_multimapping/{sample}.log'
-    shell:
-        '''
-        samtools view -f 0x100 -h {input.sam} | \
-            samtools sort | \
-            bedtools genomecov -ibam - -bga | \
-            sort -k1,1 -k2,2n > {output.bedgraph} 2> {log} || true  && \
-        bedGraphToBigWig {output.bedgraph} {input.chromsizes} {output.bigwig} 2> {log}
-        '''
 
 
 rule aggregate_multimapping:
@@ -129,9 +127,10 @@ rule aggregate_multimapping:
         rm {output.bedgraph}.log
         '''
 
+
 use rule aggregate_multimapping as aggregate_primaries with:
     input:
-        bigwigs = expand( rules.bamcoverage.output.bigwig, sample = samples_list ),
+        bigwigs = expand( rules.pileup_primaries.output.bigwig, sample = samples_list ),
         chromsizes = get_chromsizes,
     output:
         bedgraph = temp( 'analysis/all/primary-pileup.bedgraph' ),
@@ -151,7 +150,7 @@ rule secondary_primary_bigwig:
         '''
         bigWigMerge {input.primary} {input.secondary} {output}
         '''
-
+        
 
 rule multimapping_coverage_stats:
     input:
