@@ -70,7 +70,7 @@ class CNVHMM(hmmlearn.base.BaseHMM):
     
 
     @staticmethod
-    def get_trasmat_prior(n_components, pseudo_observations = 1000):
+    def get_trasmat_prior(n_components, pseudo_observations = 1000000):
         return np.ones((n_components, n_components)) + \
             np.eye(n_components)*(pseudo_observations - n_components)
 

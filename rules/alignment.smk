@@ -64,7 +64,8 @@ rule test:
 rule trim_reads_paired:
     input:
         r1 = lambda wildcards: config['samples'][wildcards.sample]['read1'],
-        r2 = lambda wildcards: config['samples'][wildcards.sample]['read2']
+        r2 = lambda wildcards: config['samples'][wildcards.sample]['read2'],
+        adapters = config['adapters_fa']
     output:
         r1 = temp('processing/fastq/{sample}_R1.trim.fastq.gz'),
         r2 = temp('processing/fastq/{sample}_R2.trim.fastq.gz'),
@@ -93,7 +94,8 @@ rule trim_reads_paired:
 
 rule trim_reads_unpaired:
     input:
-        lambda wildcards: config['samples'][wildcards.sample]['read1']
+        reads = lambda wildcards: config['samples'][wildcards.sample]['read1'],
+        adapters = config['adapters_fa']
     output:
         temp('processing/fastq/{sample}.trim.fastq.gz')
     log:
@@ -111,7 +113,7 @@ rule trim_reads_unpaired:
     shell:
         """
         trimmomatic \
-            SE {input} {output} \
+            SE {input.reads} {output} \
             ILLUMINACLIP:{params.adapters}:2:30:10 \
             MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 > {log} 2>&1
         """

@@ -2,7 +2,7 @@ import pandas as pd
 from collections import Counter
 import argparse
 import sys
-from math import log
+from math import log10
 
 def main(*,contigs_file, chromsizes_file, bedgraph, outfile):
 
@@ -15,22 +15,22 @@ def main(*,contigs_file, chromsizes_file, bedgraph, outfile):
 
     #thresholds = [1,3,10,100,1000,10000,100000]
     # set a log-threshold for the number of secondary reads per primary read
-    thresholds = [ -t*log(10) for t in range(1,11,1) ]
-
+    n_unique = [1,5,10,100,1000,10000,100000,1000000]
+    thresholds = [ log10(1/t) for t in n_unique ] + [float('inf')]
+    #print(thresholds, file = sys.stderr)
     len_trackers = { genome : Counter() for genome in contig_genome_map.values() }
 
     for line in bedgraph:
         if not line.startswith('#'):
             contig,start,end,count = line.strip().split('\t')
-            start,end,count = int(start),int(end),int(count)
+            start,end,count = int(start),int(end),float(count)
             
             for threshold in thresholds:
                 if count >= threshold:
                     len_trackers[ contig_genome_map[contig] ][threshold] += end - start
 
-    
-
-    print('#genome','#genome_size',*[f'#gt_{threshold}x_multimap_coverage' for threshold in thresholds], sep = '\t', file = outfile)
+    threshnames = [str(t) for t in n_unique] + ['inf']
+    print('#genome','#genome_size',*[f'#gt_1_multimap_per_{t}' for t in threshnames ], sep = '\t', file = outfile)
 
     for genome, tresholds in len_trackers.items():
 

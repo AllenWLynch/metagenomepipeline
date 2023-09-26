@@ -1,6 +1,6 @@
 
 # alignment
-adapters_fa : /broad/smillie-data/db/adapters/adapters.mgx.fa
+adapters_fa : /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/adapters.mgx.fa
 
 # abundance and CNVs
 min_count_quality : 20

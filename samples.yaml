@@ -1,8 +1,17 @@
 samples:
-  'UMCG3299495':
+  'UMCG3299495_1':
     is_paired: TRUE
-    read1 : /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R1.fastq.gz
-    read2: /broad/smillie-data/data/mgx/All-IBD/fastq/prism1.UMCG3299495_R2.fastq.gz
+    read1 : /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/prism1.UMCG3299495_R1.fastq.gz
+    read2: /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/prism1.UMCG3299495_R2.fastq.gz
+    metadata: 
+      disease : IBD
+      subject : 134
+      cohort : PRISM
+
+  'UMCG3299495_2':
+    is_paired: TRUE
+    read1 : /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/prism1.UMCG3299495_R1.fastq.gz
+    read2: /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/prism1.UMCG3299495_R2.fastq.gz
     metadata: 
       disease : IBD
       subject : 134

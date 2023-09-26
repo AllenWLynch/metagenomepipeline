@@ -5,4 +5,4 @@ channels:
   - defaults
 dependencies:
   - ucsc-bigwigmerge
-  - ucsc-bedgraphtobigwig=445
+  - ucsc-bedgraphtobigwig

@@ -77,21 +77,12 @@ rule bamcoverage:
         """
 
 
-use rule bamcoverage as pileup_multimapping with:
-    output:
-        bedgraph = temp('analysis/samples/{sample}/multimap.bedgraph'),
-        bigwig = temp('analysis/samples/{sample}/multimap.bw'),
-    log: 'logs/pileup_multimapping/{sample}.log'
-    params:
-        filter_str = '-b -q 0 -F -0x800 -F 0x400 -f 0x100'
-
-
 use rule bamcoverage as pileup_primaries with:
     output:
-        bedgraph = temp('analysis/samples/{sample}/primary-coverage.bedgraph'),
-        bigwig = temp( 'analysis/samples/{sample}/primary-coverage.bigwig' ),
+        bedgraph = 'analysis/samples/{sample}/multimapping/primary-coverage.bedgraph',
+        bigwig = 'analysis/samples/{sample}/multimapping/primary-coverage.bigwig',
     params:
-        quality = 0
+        filter_str = '-b -q 0 -F -0x800 -F 0x400 -F 0x100'
 
 
 rule get_multimap_stats:
@@ -99,14 +90,27 @@ rule get_multimap_stats:
         bam = rules.markduplicates.output.bam,
         contigs = get_contigs,
     output:
-        stats = 'analysis/samples/{sample}/multimap_stats.tsv',
-        multimap_sam = 'analysis/samples/{sample}/multimap.sorted-by-name.sam',
+        stats = 'analysis/samples/{sample}/multimapping/multimap_stats.tsv',
+        multimap_sam = 'analysis/samples/{sample}/multimapping/multimap.sorted-by-name.sam',
+        multimap_bam = 'analysis/samples/{sample}/multimapping/multimap.bam'
     conda:
         "envs/samtools.yaml"
     params:
         scripts = config['_external_scripts']
     shell:
-        "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats}"
+        "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats} && "
+        "samtools sort -O bam -@ {threads} -T $TMPDIR {output.multimap_sam} > {output.multimap_bam}"
+
+
+use rule bamcoverage as pileup_multimapping with:
+    input:
+        bam = rules.get_multimap_stats.output.multimap_bam,
+        chromsizes = get_chromsizes,
+    output:
+        bedgraph = temp('analysis/samples/{sample}/multimapping/multimap-coverage.bedgraph'),
+        bigwig = temp( 'analysis/samples/{sample}/multimapping/multimap-coverage.bigwig' ),
+    params:
+        filter_str = '-b -F 0x100'
 
 
 rule aggregate_multimapping:
@@ -122,7 +126,8 @@ rule aggregate_multimapping:
     shell:
         '''
         bigWigMerge {input.bigwigs} {output.bedgraph} && \
-        awk '{{print $0,$1,$2, {params.sign}log($3)}}' {output.bedgraph} > {output.bedgraph}.log && \
+        awk -v OFS=\"\\t\" '{{print $1,$2,$3, {params.sign}log($4+0.0000000000000000001)/log(10)}}' {output.bedgraph} | \
+            sort -k1,1 -k2,2n -T $TMPDIR -S 8G > {output.bedgraph}.log && \
         bedGraphToBigWig {output.bedgraph}.log {input.chromsizes} {output.bigwig} && \
         rm {output.bedgraph}.log
         '''
@@ -139,22 +144,22 @@ use rule aggregate_multimapping as aggregate_primaries with:
         sign='-'
 
 
-rule secondary_primary_bigwig:
+rule multimap_ratio_pileup:
     input:
         primary = rules.aggregate_primaries.output.bigwig,
-        secondary = rules.aggregate_multimapping.output.bigwig,
+        multimaps = rules.aggregate_multimapping.output.bigwig,
     output:
-        'analysis/all/secondary-primary-pileup.bedgraph'
+        'analysis/all/logratio-pileup.bedgraph'
     conda: 'envs/bigwigmerge.yaml'
     shell:
         '''
-        bigWigMerge {input.primary} {input.secondary} {output}
+        bigWigMerge -threshold="-10000" {input.primary} {input.multimaps} {output}
         '''
         
 
 rule multimapping_coverage_stats:
     input:
-        bedgraph = rules.secondary_primary_bigwig.output,
+        bedgraph = rules.multimap_ratio_pileup.output,
         contigs = get_contigs,
         chromsizes = get_chromsizes,
     output:
