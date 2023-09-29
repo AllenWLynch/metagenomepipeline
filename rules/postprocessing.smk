@@ -97,6 +97,10 @@ rule get_multimap_stats:
         "envs/samtools.yaml"
     params:
         scripts = config['_external_scripts']
+    resources:
+        mem_mb = double_on_failure(config['resources']['sort']['mem_mb']),
+        runtime = double_on_failure_time(config['resources']['sort']['runtime']),
+    threads: config['resources']['sort']['threads']
     shell:
         "bash {params.scripts}/multimap-stats {input.bam} {input.contigs} {output.multimap_sam} {output.stats} && "
         "samtools sort -O bam -@ {threads} -T $TMPDIR {output.multimap_sam} > {output.multimap_bam}"
