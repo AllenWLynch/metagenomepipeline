@@ -10,7 +10,7 @@ Create a new directory to house the pipeline and its associated files:
 
     $ mkdir pipeline && cd pipeline
 
-And clone the Github repository:
+and clone the Github repository:
 
 .. code-block:: bash
 
@@ -48,8 +48,8 @@ make these programs executable, and add them to your path.
         variants            Call variants from aligned reads
 
 The "smillie-pipeline" command has four subcommands, which launch nested pipelines.
-For example, if you run "smillie-pipeline variants", this will also ensure that 
-all the annotations are present by launching the "build-ref" pipeline, if needed. 
+For example, if you run "smillie-pipeline variants", this may also launch the "build-ref" pipeline
+if some of the necessary annotations or files are not present.
 I suggest running these four commands in sequence to ensure that each previous
 step performs as expected.
 
@@ -81,7 +81,7 @@ Each command takes the same arguments:
                             Arguments to pass to snakemake. Every argument passed after the -s flag will be passed to snakemake. See the snakemake command line documentation
                             for more information.
 
-**--samples-config**
+**--samples-config**:
 Path to a yaml file which specifies the samples to process, and their metadata. That yaml file
 should be in the format:
 
@@ -89,8 +89,8 @@ should be in the format:
 
     samples:
         sample_name_1:
-            read1 : /path/to/R1.fastq.gz
-            read2: /path/to/R2.fastq.gz
+            read1 : absolute/path/to/R1.fastq.gz
+            read2: absolute/path/to/R2.fastq.gz
             is_paired: TRUE/FALSE
             is_trimmed: TRUE/FALSE
             metadata: 
@@ -102,7 +102,7 @@ should be in the format:
         sample_name_2:
             ...
 
-With an outer header "samples", under which each sample is listed. Each sample
+With an outer header "samples", under which each sample is listed. A sample
 has a unique name, with the following required fields:
 
 - read1 : Path to the first read file. If the reads are single-end, then this is the only read file.
@@ -110,10 +110,12 @@ has a unique name, with the following required fields:
 - is_paired : Whether the reads are paired-end or single-end. This is a boolean value, and can be TRUE/FALSE, True/False, true/false, 1/0, or yes/no.
 - is_trimmed : Whether the reads have been trimmed. This is a boolean value, and can be TRUE/FALSE, True/False, true/false, 1/0, or yes/no.
 
-The "metadata" field is optional, and can be used to specify any additional metadata about the sample.
+*Use absolute paths in the sample configuration!*
+
+The "metadata" field is optional, and can be used to specify any additional data about the sample.
 You can provide any arbitrary key-value pairs.
 
-**--genomes-config**
+**--genomes-config**:
 Path to a yaml file which specifies the genomes to use, and their
 UHGG identifiers. This file should be in the format (for example):
 
@@ -130,33 +132,33 @@ UHGG identifiers. This file should be in the format (for example):
             species : Faecalibacterium prausnitzii
 
 
-With an outer header "genomes", under which each genome is listed. Each genome
+with an outer header "genomes", under which each genome is listed. Each genome
 has a unique name, and following required fields:
 
 - GUT_ID : The UHGG identifier for the genome.
 - MGYG : The MGYG identifier for the genome.
 - species : The species name for the genome.
 
-**--directory**
-Specifies the directory in which to save the pipeline results.
+**--directory**:
+The directory in which to save the pipeline results.
 If the directory already exists, the pipeline will resume from the last completed step for files within that directory, 
 otherwise, the pipeline will start from the beginning.
 
-**--parameters-config**
-Specifies the path to a yaml file which contains the parameters
+**--parameters-config**:
+Path to a yaml file which contains the parameters
 for the pipeline. By default, this is the "parameters.yaml" file in the pipeline directory,
 which you can modify to change default parameters of the pipeline.
 
 The next set of arguments control the pipeline runtime and adjust its behavior on the cluster.
 
-**--cluster**
+**--cluster**:
 Tells the pipeline to run on the cluster instead of locally.
 In this mode, each rule to be executed will be submitted as a qsub job.
 
-**--cores**
-Specifies the number of cores to use when running locally.
+**--cores**:
+Number of cores to use when running locally.
 
-**--snake-args**
+**--snake-args**:
 Every argument passed after the "--snake-args" flag will be passed to snakemake. See the snakemake command line documentation
 for more information. Perhaps the most important argument is "--dryrun/-n", which will print out the commands that would be run
 if the pipeline were executed to completion. I higly suggest running the pipeline with "--dryrun" first to ensure that the
@@ -197,10 +199,10 @@ The pipeline will save results in the directory with the following structure:
     ├── processing
 
 
-**analysis**: Where final, processed results are saved.
+**analysis**: Final, fully-processed files are saved here.
 **analysis/all**: under "analysis/all", you will find summary statistics and results aggregated across samples. A completed pipeline run will produce:
 
-- logratio-pileup.bw: the log10 fold ratio of unique primaries to multimapped reads across loci.
+- logratio-pileup.bw: the log10 ratio of unique primaries to multimapped reads across loci.
 - multimap-pileup.bw: log10 of the number of multimapped reads across loci.
 - primary-pileup.bw: log10 of the number of unique primaries across loci.
 - multimap-stats.tsv: summary statistics for multimapped reads across loci, including the proportion of the genome which is covered with x fraction of multimapped reads.
@@ -209,9 +211,9 @@ The pipeline will save results in the directory with the following structure:
 **analysis/samples**: results for each sample, with structure:
 
 ::
-
-    ├── sample_name.bam
-    ├── sample_name.bam.bai
+    {sample_name}
+    ├── {sample_name}.bam
+    ├── {sample_name}.bam.bai
     ├── coverage.bigwig
     ├── feature_counts
     │   ├── f-prau.tsv.summary
@@ -223,7 +225,8 @@ The pipeline will save results in the directory with the following structure:
         ├── multimap.sorted-by-name.sam
         └── primary-coverage.bigwig
 
-Where "feature_counts.tsv" contains the number of reads aligned to each element of each genome.
+- "feature_counts.tsv" contains the number of reads aligned to each element of each genome.
+- "coverage.bigwig" shows the read depth at each locus.
 
 **genomes**: Stores annotation information, with a directory for each species' genome, as well as 
 "all", which contains the concatenated annotations for all genomes. The information under "all" 
