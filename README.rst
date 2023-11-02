@@ -200,6 +200,7 @@ The pipeline will save results in the directory with the following structure:
 
 
 **analysis**: Final, fully-processed files are saved here.
+
 **analysis/all**: under "analysis/all", you will find summary statistics and results aggregated across samples. A completed pipeline run will produce:
 
 - logratio-pileup.bw: the log10 ratio of unique primaries to multimapped reads across loci.
@@ -244,8 +245,11 @@ file summarizes the contigs associated with each genome and species:
     f-prau  GUT_GENOME140074_4      Faecalibacterium-prausnitzii
 
 **benchmark**: Stores benchmarking information, including the time and memory usage of each rule.
+
 **logs**: Stores the log files for each rule.
+
 **QC** : Empty at the moment, but one could add FastQC or something if that was important.
+
 **processing**: Stores intermediate files (SAM files, unfiltered VCFs, etc.), which are deleted when no longer needed.
 
 Manipulating configuration files
