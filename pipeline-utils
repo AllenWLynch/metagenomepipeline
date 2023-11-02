@@ -94,7 +94,9 @@ def get_parser():
                               type = argparse.FileType('r'), 
                               help='Yaml file to convert')
     df_convert.add_argument('--subsection', '-s',type = str, required=True,
-                              help = 'Write dictionary under subsection name in the YAML file. If "NONE" is passed, the dictionary will be written at the top level.')
+                              help = 'Write dictionary under subsection name in the YAML file.\n'
+                              'If "NONE" is passed, the dictionary will be written at the top level.'
+                            )
     df_convert.add_argument('--delim','-d', type = str, default = '\t')
     df_convert.set_defaults(func=convert_df_to_yaml)
     

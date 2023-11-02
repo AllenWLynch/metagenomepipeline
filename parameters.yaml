@@ -1,13 +1,21 @@
 
-# alignment
+# The path to the adapters file to use for trimming
+# irrelevant if using already-trimmed fastqs
 adapters_fa : /Users/allenwlynch/projects/metagenomes/pipeline/data/realdata/adapters.mgx.fa
 
-# abundance and CNVs
-min_count_quality : 20
-cnv_window_size : 200
+# The minimum mapping quality of reads to consider for
+# abundance counting. A value of 255 means the read is uniquely mapped.
+min_count_quality : 255
 
-# variant calling
+## variant calling ##
+# Assume a ploidy of 8 when calling the genotypes of each sample
 base_ploidy : 8
+
+# minimum number of reads supporting a variant to run the statistical genotyper
 min_supporting_reads : 3
+
+# minimum FDR required for a variant to pass filtering
 variant_fdr : 0.01
-variant_calling_window_size : 2 # in MB
+
+# how large of chunks to split the genome for variant calling. More chunks = more parallelizable.
+variant_calling_window_size : 1 # in MB

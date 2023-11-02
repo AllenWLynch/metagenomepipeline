@@ -3,9 +3,8 @@
 bam_in=$1
 contigs=$2
 sam_out=$3
-stats_out=$4
 
-if [ -z "$bam_in" ] || [ -z "$contigs" ] || [ -z "$sam_out" ] || [ -z "$stats_out" ]; then
+if [ -z "$bam_in" ] || [ -z "$contigs" ] || [ -z "$sam_out" ]; then
     echo "Usage: $0 bam-in contigs sam-out stats-out"
     exit 1
 fi
@@ -34,30 +33,4 @@ samtools view -q 0 -F -0x800 -F 0x400 -F 0x4 -f 0x2 -f 0x1 -f 0x40 -h $bam_in \
                 count[$1] = 1;
             }
         } 
-    }' >> $sam_out
-
-
-TMPFILE=$(mktemp)
-
-# Join the sam file with the contigs file to get the species
-# for each read's aligned contig.
-join -1 2 -2 1  \
-    <(samtools view $sam_out | cut -f1,3 | sort -k2,2) \
-    <(awk -v OFS="\t" '{print $2,$3}' $contigs | grep -v "#" | sort -k1,1) \
-    > $TMPFILE
-
-
-# Group the read-species pairs by read, then get all of the species each read aligns to.
-# Count the number of reads that align to each combination of species,
-# And save the results to a file.
-python -c "import pandas as pd;\
-    pd.read_csv('$TMPFILE', header = None, sep = ' ', names = ['contig','read','species'])\
-        .groupby(['read'])['species'].apply(lambda x : ', '.join(set(x))).value_counts()\
-        .to_frame().reset_index().to_csv(\
-            '$stats_out',
-            sep = '\t',
-            header = False,
-            index = False
-        )"
-
-rm $TMPFILE
+    }' > $sam_out

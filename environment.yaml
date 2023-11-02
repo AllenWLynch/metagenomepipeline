@@ -1,0 +1,11 @@
+name: smilliepipeline
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9
+  - snakemake-minimal>=7.32.4
+  - snakemake-wrapper-utils
+  - pandas
+  - mamba

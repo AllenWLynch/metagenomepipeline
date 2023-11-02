@@ -19,6 +19,12 @@ def check_file_exists(filename):
     return filename
 
 
+def check_dir_exists(dirname):
+    if not os.path.isdir(dirname):
+        raise argparse.ArgumentTypeError(f'Invalid directory name: {dirname}')
+    return dirname
+
+
 def add_snake_arg(command, key, value):
     command.append(f'{key}={value}')
     return command
@@ -50,6 +56,8 @@ def get_snakemake_command(args):
     if not args.snake_args is None:
         command.extend( args.snake_args )
 
+    command.extend(['--directory', args.directory])
+
     command.extend([
         '--configfiles', args.samples_config, args.genomes_config, args.parameters_config, resources_config,
     ])
@@ -71,21 +79,29 @@ def get_parser():
         
         argument_group = parser.add_argument_group('Common arguments')
         argument_group.add_argument('--cluster', action = 'store_true', default=False,
-                                help = 'Run jobs on cluster instead of locally.')
-        argument_group.add_argument('--cores', '-c', type = int, default=1,)
+                                help = 'Run jobs on cluster instead of locally. This will use qsub to submit jobs to the scheduler.')
+        argument_group.add_argument('--cores', '-c', type = int, default=1,
+                                help = 'Number of cores to use when running locally. Default: 1')
         argument_group.add_argument('--snake-args', '-s', nargs = argparse.REMAINDER, 
-                                help = 'Arguments to pass to snakemake')
-        
+                                help = 'Arguments to pass to snakemake. Every argument passed after the -s flag will be passed to snakemake.\n'
+                                        'See the snakemake command line documentation for more information.'
+                                    )
     
     def add_pipeline_args(parser):
         argument_group = parser.add_argument_group('Pipeline arguments')
         argument_group.add_argument('--samples-config', '-samples', type = check_file_exists, required=True,
-                        help = 'Specifies the samples and groups of samples to process')
+                        help = 'Specifies the samples to process and their metadata.')
         argument_group.add_argument('--genomes-config','-genomes', type = check_file_exists, required=True,
                                 help = 'Configuration file for sequences and annotations')
+        argument_group.add_argument('--directory','-dir', type = check_dir_exists, required=True,
+                                help = 'Directory in which to save pipeline results. Providing a new directory\n'
+                                       'starts a new pipeline run. If the directory already exists, the pipeline\n'
+                                       'will resume from the last completed step.'
+                                    )
         argument_group.add_argument('--parameters-config', '-parameters', type = check_file_exists, 
                                 default = os.path.join(snakepath, 'parameters.yaml'),
-                                help = 'Configuration file for parameters')
+                                help = 'Configuration file for parameters. Default: parameters.yaml'
+                                )
     
 
     buildref_subparser = subparser.add_parser('build-ref', help = 'Download genomes and create indexes for various tools.')

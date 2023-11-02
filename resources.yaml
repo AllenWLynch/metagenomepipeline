@@ -41,11 +41,6 @@ resources:
     runtime: 1h
     threads: 1
 
-  call_cnvs_and_ptrs:
-    mem_mb: 8000
-    runtime: 30m
-    threads: 1
-
   merge_vcfs:
     mem_mb : 8000
     runtime: 1h

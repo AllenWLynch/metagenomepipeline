@@ -2,7 +2,10 @@
 wildcard_constraints:
     genome = '[a-zA-Z0-9._-]+|all'
 
-
+##
+# Downloading genomes from UHGG, the script tries different endpoints until the 
+# right file is downloaded.
+##
 rule download_annotation:
     output:
         temp('genomes/{genome}/annotation.gff')
@@ -16,7 +19,10 @@ rule download_annotation:
         'gunzip {params.gut_id}.gff.gz -c > {output} && '
         'rm {params.gut_id}.gff.gz'
 
-
+##
+# UHGG provides a GFF and FASTA concatenated into one file,
+# This rule splits them into separate files.
+##
 rule genome:
     input:
         rules.download_annotation.output
@@ -34,7 +40,9 @@ rule genome:
                 else:
                     gff.write(line)
 
-
+##
+# Calculate summary genome files
+##
 rule summarize_genome:
     input:
         'genomes/{genome}/genomic.fa',
@@ -52,7 +60,9 @@ rule summarize_genome:
         samtools dict {input} -o {output.dict}
         '''
 
-
+##
+# The contigs file is just a list of contigs in the genome
+##
 rule make_contigs_file:
     input:
         'genomes/{genome}/genomic.fa'
@@ -66,9 +76,3 @@ rule make_contigs_file:
     shell:
         'echo -e "{params.header}" > {output} && ' 
         'grep ">" {input} | cut -c2- | cut -f1 -d" " | awk -v OFS="\t" \'{{print "{wildcards.genome}", $0, "{params.species}"}}\' >> {output}'
-        
-
-#gc_skew_bedgraph = 'genomes/gc_skew.bedgraph.gz',
- #       oris = 'genomes/replication_factors.bed'
-"""bash {params.scripts}/ORIfinder \
-            {input} {output.chromsizes} {output.gc_skew_bedgraph} > {output.oris}"""

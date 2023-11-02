@@ -4,7 +4,6 @@ from math import sqrt, log10
 #  Count the number of mapped reads falling on each "gene" feature in the gff
 #  Save genes x counts for each genome in a separate file
 ##
-
 rule get_CDS_features:
     input:
         'genomes/{genome}/genomic.gff'
@@ -73,85 +72,40 @@ rule summarize_abundances:
         ).fillna(0.).to_csv(output[0], sep = '\t')
 
 
-## Section 2 - CNV calling
-# Using information from the origin of replication and coverage,
-# Call CNVs and PTRs for each sample
 ##
-rule find_oris:
+# Section 2: Variant calling
+# These rules split the genomes into large chunks, and call variants across all samples 
+# on these large chunks. The VCFs from each chunk are filtered for low-confidence variants
+# and annotated using SNPEff. Finally, the VCFs are merged into the "master" variant call list.
+##
+
+rule make_snpEff_db:
     input:
         fasta = get_reference,
-        chromsizes = get_chromsizes,
+        gff = get_gff,
     output:
-        temp('genomes/all/oris.bed')
-    threads: 1
+        config = 'analysis/snpEff/snpEff.config',
+        done = touch('analysis/snpEff/done.txt')
     conda:
-        'envs/bedtools.yaml'
+        "envs/snpEff.yaml"
+    params:
+        db = 'IBD',
+        genome_dir = 'analysis/snpEff/data/'
     log:
-        'logs/find_oris.log'
-    benchmark:
-        'benchmark/find_oris.tsv'
-    params:
-        scripts = config['_external_scripts']
+        'logs/make_snpEff_db.log'
     shell:
         """
-        bash {params.scripts}/ORIFinder {input.fasta} {input.chromsizes} > {output}
+        mkdir -p {params.genome_dir}/{params.db} && \
+        echo -e "{params.db}.genome : {params.db}" > {output.config} && \
+        cp {input.gff} {params.genome_dir}/{params.db}/genes.gff && \
+        cp {input.fasta} {params.genome_dir}/{params.db}/sequences.fa && \
+        snpEff build -gff3 -v -c {output.config} -noCheckCDS -noCheckProtein {params.db} > {log} 2>&1
         """
-
-
-cnv_outprefix = 'analysis/samples/{sample}/MetaCNV'
-rule call_cnvs_and_ptrs:
-    input:
-        fasta = get_reference,
-        bigwig = rules.bamcoverage.output.bigwig,
-        ori = rules.find_oris.output,
-    output:
-        cnv_info = cnv_outprefix + '.ploidy.bgmtx.gz',
-        cnv_calls = cnv_outprefix + '.ploidy.bedgraph.gz',
-        ptr = cnv_outprefix + '.PTR.tsv',
-        cnv_deviations = cnv_outprefix + '.deviations.bed',
-    resources:
-        mem_mb = double_on_failure(config['resources']['call_cnvs_and_ptrs']['mem_mb']),
-        runtime = double_on_failure_time(config['resources']['call_cnvs_and_ptrs']['runtime'])
-    threads: 1
-    conda:
-        "envs/metaCNV.yaml"
-    log:
-        'logs/metaCNV/{sample}.log'
-    benchmark:
-        'benchmark/metaCNV/{sample}.tsv'
-    params:
-        outprefix = cnv_outprefix,
-        scripts = config['_external_scripts']
-    shell:
-        """
-        python {params.scripts}/metaCNV/RunMetaCNV \
-            --fasta {input.fasta} \
-            --bigwig {input.bigwig} \
-            --ori {input.ori} \
-            --outprefix {params.outprefix} > {log} 2>&1 && \
-        \
-        gunzip -c {output.cnv_calls} | \
-            awk -v OFS=\"\t\" '$4!=1 {{print $1, $2, $3,\"{wildcards.sample}\",$4}}' > {output.cnv_deviations}
-        """
-
-
-
-rule aggregate_ploidy_changes:
-    input:
-        cnv_calls = expand(rules.call_cnvs_and_ptrs.output.cnv_deviations,
-                        sample = samples_list),
-    output:
-        temp('processing/variants/cnv_calls.bed')
-    params:
-        ploidy = config['base_ploidy']
-    shell:
-        "cat {input.cnv_calls} | "
-        "awk -v OFS=\"\t\" '{{print $1, $2, $3, $4, $5*{params.ploidy} }}' "
-        "> {output}"
 
 
 wildcard_constraints:
     region='[a-zA-Z0-9._-]+:[0-9]+-[0-9]+'
+
 
 rule callvariants:
     input:
@@ -189,30 +143,6 @@ rule callvariants:
         """
 
 
-rule make_snpEff_db:
-    input:
-        fasta = get_reference,
-        gff = get_gff,
-    output:
-        config = 'analysis/snpEff/snpEff.config',
-        done = touch('analysis/snpEff/done.txt')
-    conda:
-        "envs/snpEff.yaml"
-    params:
-        db = 'IBD',
-        genome_dir = 'analysis/snpEff/data/'
-    log:
-        'logs/make_snpEff_db.log'
-    shell:
-        """
-        mkdir -p {params.genome_dir}/{params.db} && \
-        echo -e "{params.db}.genome : {params.db}" > {output.config} && \
-        cp {input.gff} {params.genome_dir}/{params.db}/genes.gff && \
-        cp {input.fasta} {params.genome_dir}/{params.db}/sequences.fa && \
-        snpEff build -gff3 -v -c {output.config} -noCheckCDS -noCheckProtein {params.db} > {log} 2>&1
-        """
-
-
 rule annotate_vcf:
     input:
         vcf = rules.callvariants.output,
@@ -235,7 +165,9 @@ rule annotate_vcf:
     shell:
         "awk '$4 !~ /N/' {input.vcf} | snpEff -c {input.snpEff_config} IBD > {output}"
 
-
+##
+# Split the genome into chunks for variant calling
+##
 checkpoint chunk_genome:
     input:
         get_chromsizes,
@@ -248,7 +180,11 @@ checkpoint chunk_genome:
     shell:
         'bedtools makewindows -g {input} -w {params.window_size} > {output}'
 
-
+##
+# Run the rule above, and read the chunks.
+# Then, return a list of target VCFs, one per region to
+# instruct the pipeline to generate each.
+##
 def get_chunked_variant_calls(wildcards):
 
     regions_file = checkpoints.chunk_genome.get(**wildcards).output[0]
@@ -267,6 +203,9 @@ def get_chunked_variant_calls(wildcards):
 def fdr_to_qual(fdr):
     return int(-10 * log10(fdr))
 
+##
+# This rule takes each VCF chunk, merges them, and filters out low-quality variants.
+## 
 rule merge_vcfs:
     input:
         vcfs = get_chunked_variant_calls,

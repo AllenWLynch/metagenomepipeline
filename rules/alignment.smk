@@ -1,7 +1,8 @@
 
-
+##
 # This rule merges all the GFF annotations into a single file
 # for alignment indexing.
+##
 rule merge_annotations:
     input:
         fastas = expand('genomes/{genome}/genomic.fa', genome = genomes_list),
@@ -29,9 +30,12 @@ rule merge_annotations:
         cat {input.contigs} | grep -v '^#genome' >> {output.contigs}
         """
 
-
+##
 # Construct the bowtie index for alignment.
+#
+# Define a variable for the index prefix which can be referenced by the alignment rules
 index_prefix = 'processing/index/bowtie2_index' 
+## 
 rule make_index:
     input:
         get_reference
@@ -81,13 +85,11 @@ rule trim_reads_paired:
         'logs/trim/{sample}.log'
     benchmark:
         'benchmark/trim/{sample}.tsv'
-    params:
-        adapters = config['adapters_fa']
     shell:
         """
         trimmomatic \
             PE {input.r1} {input.r2} {output.r1} {output.unmatched1} {output.r2} {output.unmatched2} \
-            ILLUMINACLIP:{params.adapters}:2:30:10:8:TRUE \
+            ILLUMINACLIP:{input.adapters}:2:30:10:8:TRUE \
             MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 > {log} 2>&1
         """
 
@@ -108,13 +110,11 @@ rule trim_reads_unpaired:
     threads: config['resources']['trimmomatic']['threads']
     message:
         'Trimming reads for SE sample {wildcards.sample}'
-    params:
-        adapters = config['adapters_fa']
     shell:
         """
         trimmomatic \
             SE {input.reads} {output} \
-            ILLUMINACLIP:{params.adapters}:2:30:10 \
+            ILLUMINACLIP:{input.adapters}:2:30:10 \
             MAXINFO:80:0.5 MINLEN:50 AVGQUAL:20 > {log} 2>&1
         """
 
@@ -140,8 +140,7 @@ rule align_pe:
         reads = get_reads_paired,
         index = rules.make_index.output
     output:
-        sam = temp('processing/align/{sample}-pe.sam'),
-        stats = 'QC/samples/{sample}/flagstat.txt'
+        sam = temp('processing/align/{sample}-pe.sam')
     conda:
         'envs/bowtie2.yaml'
     resources:
@@ -160,8 +159,7 @@ rule align_pe:
             -x {params.index} \
             -1 {input.reads[0]} -2 {input.reads[1]} \
             --threads {threads} \
-            --very-sensitive -a --no-unal -S {output.sam} > {log} 2>&1 \
-        && samtools flagstat {output.sam} > {output.stats}
+            --very-sensitive -a --no-unal -S {output.sam} > {log} 2>&1
         """
 
 
@@ -181,8 +179,7 @@ rule align_se:
         reads = get_reads_se,
         index = rules.make_index.output,
     output:
-        sam = temp('processing/align/{sample}-se.sam'),
-        stats = 'QC/samples/{sample}/flagstat.txt'
+        sam = temp('processing/align/{sample}-se.sam')
     conda:
         'envs/bowtie2.yaml'
     resources:
@@ -201,6 +198,5 @@ rule align_se:
             --rg-id {wildcards.sample} --rg SM:{wildcards.sample} \
             -U {input.reads} \
             --threads {threads} \
-            --very-sensitive -a --no-unal -S {output} > {log} 2>&1 \
-        && samtools flagstat {output.sam} > {output.stats}
+            --very-sensitive -a --no-unal -S {output} > {log} 2>&1
         """
