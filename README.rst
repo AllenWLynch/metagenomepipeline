@@ -211,6 +211,7 @@ The pipeline will save results in the directory with the following structure:
 **analysis/samples**: results for each sample, with structure:
 
 ::
+
     {sample_name}
     ├── {sample_name}.bam
     ├── {sample_name}.bam.bai
